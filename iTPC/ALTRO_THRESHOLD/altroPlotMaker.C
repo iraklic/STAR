@@ -26,9 +26,7 @@ void altroPlotMaker()
 	leg->Draw();
 
 //	c->Close();
-//	altro3->Close();
-//	altro4->Close();
-//	============================================================
+//	= Inverse Cumulative Distribution of Above Histograms ======
 	hAltro3->ComputeIntegral();
 	double * integral3 = hAltro3->GetIntegral();
 	hAltro3->SetContent(integral3);	
@@ -58,5 +56,28 @@ void altroPlotMaker()
 	leg1->AddEntry(h23, "Altro_thr = 3", "l");
 	leg1->AddEntry(h24, "Altro_thr = 4", "l");
 	leg1->Draw();
+
+//	altro3->Close();
+//	altro4->Close();
+//
+//	= Anti-efficiency plot =====================================
+	altro3 = new TFile("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/TPC_reconstruction/y2014_Altro_thr_3/V02/MuMc.root");
+	altro4 = new TFile("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/TPC_reconstruction/y2014_Altro_thr_4/V02/MuMc.root");
+
+	TH1D * antiEffNegAltro3 = (TH1D *) altro3->Get("LostGNegMcLostPr_z_1");
+	TH1D * antiEffPosAltro3 = (TH1D *) altro3->Get("LostGPosMcLostPr_z_1");
+
+	TH1D * antiEffNegAltro4 = (TH1D *) altro4->Get("LostGNegMcLostPr_z_1");
+	TH1D * antiEffPosAltro4 = (TH1D *) altro4->Get("LostGPosMcLostPr_z_1");
+
+	TCanvas * c1 = new TCanvas();
+	antiEffNegAltro3->Draw();
+	antiEffNegAltro3->SetMarkerColor(1);
+	antiEffNegAltro4->Draw("same");
+
+	TCanvas * c2 = new TCanvas();
+	antiEffPosAltro3->Draw();
+	antiEffPosAltro3->SetMarkerColor(1);
+	antiEffPosAltro4->Draw("same");
 
 	}
