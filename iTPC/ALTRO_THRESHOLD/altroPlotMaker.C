@@ -65,19 +65,32 @@ void altroPlotMaker()
 	altro4 = new TFile("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/TPC_reconstruction/y2014_Altro_thr_4/V02/MuMc.root");
 
 	TH1D * antiEffNegAltro3 = (TH1D *) altro3->Get("LostGNegMcLostPr_z_1");
-	TH1D * antiEffPosAltro3 = (TH1D *) altro3->Get("LostGPosMcLostPr_z_1");
+	TH1D * antiEffPosAltro3 = (TH1D *) altro3->Get("LostGPosMcLostPr_z");
 
 	TH1D * antiEffNegAltro4 = (TH1D *) altro4->Get("LostGNegMcLostPr_z_1");
-	TH1D * antiEffPosAltro4 = (TH1D *) altro4->Get("LostGPosMcLostPr_z_1");
+	TH1D * antiEffPosAltro4 = (TH1D *) altro4->Get("LostGPosMcLostPr_z");
 
 	TCanvas * c1 = new TCanvas();
+	c1->SetLogx();
 	antiEffNegAltro3->Draw();
 	antiEffNegAltro3->SetMarkerColor(1);
+	antiEffNegAltro3->SetLineColor(1);
 	antiEffNegAltro4->Draw("same");
 
+	TLegend * leg2 = new TLegend(0.65, 0.79, 0.89, 0.89);
+	leg2->AddEntry(antiEffNegAltro3, "Altro thr = 3", "p");
+	leg2->AddEntry(antiEffNegAltro4, "Altro thr = 4", "p");
+	leg2->Draw();
+
 	TCanvas * c2 = new TCanvas();
+	c2->SetLogx();
 	antiEffPosAltro3->Draw();
-	antiEffPosAltro3->SetMarkerColor(1);
+	antiEffPosAltro4->SetMarkerColor(2);
+	antiEffPosAltro4->SetLineColor(2);
 	antiEffPosAltro4->Draw("same");
 
+	TLegend * leg3 = new TLegend(0.65, 0.79, 0.89, 0.89);
+	leg3->AddEntry(antiEffPosAltro3, "Altro thr = 3", "p");
+	leg3->AddEntry(antiEffPosAltro4, "Altro thr = 4", "p");
+	leg3->Draw();
 	}
