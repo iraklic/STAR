@@ -10,6 +10,7 @@
 #include "TLeaf.h"
 #include "TEfficiency.h"
 #include "TLegend.h"
+#include "TFile.h"
 
 using namespace std;
 
@@ -30,6 +31,7 @@ vector<var> mcaltro4;
 template <class histObject>
 void drawHists(histObject h1, histObject h2, const char * name, const char * titles)
 	{
+	TFile * myFile = new TFile("altro.root", "RECREATE");
 	char outName[100];
 	TCanvas * c = new TCanvas();
 	c->Clear();
@@ -38,14 +40,18 @@ void drawHists(histObject h1, histObject h2, const char * name, const char * tit
 	h2->SetLineColor(2);
 	h2->Draw("same");
 
-	TLegend * leg = new TLegend(0.1, 0.7, 0.3, 0.9);
-	leg->AddEntry(h1, "Altro thr = 3", "pl");
-	leg->AddEntry(h2, "Altro thr = 4", "pl");
+	TLegend * leg = new TLegend(0.1, 0.1, 0.3, 0.3);
+	leg->AddEntry(h1, "Altro thr = 4", "pl");
+	leg->AddEntry(h2, "Altro thr = 3", "pl");
 	leg->Draw();
 
 	sprintf(outName, "%s.gif", name);
 	c->SaveAs(outName);
 	delete c;
+
+	h1->Write();
+	h2->Write();
+	myFile->Close();
 	}
 
 vector<var> branchToVec(const char * file, const char * branch)
@@ -87,20 +93,22 @@ vector<var> branchToVec(const char * file, const char * branch)
 void efficiency()
 	{
 	double ptCut = 0.1;
-	char partName [200];
 
 //	altro3
-	TH2F * ptEta = new TH2F ("ptEtaaltro3", "altro3 p_{T} vs. #eta", 100, -3, 3, 100, 0, 3);
-	TH2F * mcptEta = new TH2F ("mcptEtaaltro3", "altro3 MC p_{T} vs. #eta", 100, -3, 3, 100, 0, 3);
+	TH2F * ptEta = new TH2F ("ptEtaaltro3", "altro3 p_{T} vs. #eta", 100, -2, 2, 100, 0, 3);
+	TH2F * mcptEta = new TH2F ("mcptEtaaltro3", "altro3 MC p_{T} vs. #eta", 100, -2, 2, 100, 0, 3);
 
 	for (vector<var>::iterator it = altro3.begin(); it != altro3.end(); it++)
-		ptEta->Fill(it->eta, it->pt);
+		if (it->pid == 7 || it->pid == 8) ptEta->Fill(it->eta, it->pt);
 
 	for (vector<var>::iterator it = mcaltro3.begin(); it != mcaltro3.end(); it++)
-		mcptEta->Fill(it->eta, it->pt);
+		if (it->pid == 7 || it->pid == 8) mcptEta->Fill(it->eta, it->pt);
 
 	TH1D * h_eta = ptEta->ProjectionX("etaaltro3", ptEta->ProjectionY()->FindBin(ptCut), 100);
 	TH1D * mch_eta = mcptEta->ProjectionX("mcetaaltro3", mcptEta->ProjectionY()->FindBin(ptCut), 100);
+
+	TH1D * h_pt = ptEta->ProjectionY("ptaltro3_F", ptEta->ProjectionX()->FindBin(-1.5), ptEta->ProjectionX()->FindBin(1.5));
+	TH1D * mch_pt = mcptEta->ProjectionY("mcptaltro3_F", mcptEta->ProjectionX()->FindBin(-1.5), mcptEta->ProjectionX()->FindBin(1.5));
 
 	TH1D * h_pt1 = ptEta->ProjectionY("ptaltro3_1", ptEta->ProjectionX()->FindBin(-0.5), ptEta->ProjectionX()->FindBin(0.5));
 	TH1D * mch_pt1 = mcptEta->ProjectionY("mcptaltro3_1", mcptEta->ProjectionX()->FindBin(-0.5), mcptEta->ProjectionX()->FindBin(0.5));
@@ -115,17 +123,20 @@ void efficiency()
 	mch_pt2->Add(h_pt3);
 
 //	altro4
-	TH2F * ptEtad = new TH2F ("ptEtaaltro4", "altro4 p_{T} vs. #eta", 100, -3, 3, 100, 0, 3);
-	TH2F * mcptEtad = new TH2F ("mcptEtaaltro4", "altro4 MC p_{T} vs. #eta", 100, -3, 3, 100, 0, 3);
+	TH2F * ptEtad = new TH2F ("ptEtaaltro4", "altro4 p_{T} vs. #eta", 100, -2, 2, 100, 0, 3);
+	TH2F * mcptEtad = new TH2F ("mcptEtaaltro4", "altro4 MC p_{T} vs. #eta", 100, -2, 2, 100, 0, 3);
 
 	for (vector<var>::iterator it = altro4.begin(); it != altro4.end(); it++)
-			ptEtad->Fill(it->eta, it->pt);
+			if (it->pid == 7 || it->pid == 8) ptEtad->Fill(it->eta, it->pt);
 
 	for (vector<var>::iterator it = mcaltro4.begin(); it != mcaltro4.end(); it++)
-			mcptEtad->Fill(it->eta, it->pt);
+			if (it->pid == 7 || it->pid == 8) mcptEtad->Fill(it->eta, it->pt);
 
 	TH1D * h_etad = ptEtad->ProjectionX("etaaltro4", ptEtad->ProjectionY()->FindBin(ptCut), 100);
 	TH1D * mch_etad = mcptEtad->ProjectionX("mcetaaltro4", mcptEtad->ProjectionY()->FindBin(ptCut), 100);
+
+	TH1D * h_ptd = ptEtad->ProjectionY("ptaltro4_F", ptEtad->ProjectionX()->FindBin(-1.5), ptEtad->ProjectionX()->FindBin(1.5));
+	TH1D * mch_ptd = mcptEtad->ProjectionY("mcptaltro4_F", mcptEtad->ProjectionX()->FindBin(-1.5), mcptEtad->ProjectionX()->FindBin(1.5));
 
 	TH1D * h_pt1d = ptEtad->ProjectionY("ptaltro4_1", ptEtad->ProjectionX()->FindBin(-0.5), ptEtad->ProjectionX()->FindBin(0.5));
 	TH1D * mch_pt1d = mcptEtad->ProjectionY("mcptaltro4_1", mcptEtad->ProjectionX()->FindBin(-0.5), mcptEtad->ProjectionX()->FindBin(0.5));
@@ -142,38 +153,36 @@ void efficiency()
 	char effName[200];
 
 	TEfficiency * effEta = new TEfficiency (*h_eta, *mch_eta);
-	sprintf(effName, "altro3_effvsY_%s", partName);
+	sprintf(effName, "altro3_effvsY");
 	effEta->SetName(effName);
-//	effEta->SetTitle("p_{T} > 0.1 GeV; y; Efficiency");
+
+	TEfficiency * effPt_Full = new TEfficiency (*h_pt, *mch_pt);
+	TEfficiency * effPtd_Full = new TEfficiency (*h_ptd, *mch_ptd);
 
 	TEfficiency * effPt = new TEfficiency (*h_pt1, *mch_pt1);
-	sprintf(effName, "altro3_effvsPt_Y1_%s", partName);
+	sprintf(effName, "altro3_effvsPt_Y1");
 	effPt->SetName(effName);
-//	effEta->SetTitle("|y| < 0.5; p_{T}; Efficiency");
 
 	TEfficiency * effPt1 = new TEfficiency (*h_pt2, *mch_pt2);
-	sprintf(effName, "altro3_effvsPt_Y2_%s", partName);
+	sprintf(effName, "altro3_effvsPt_Y2");
 	effPt1->SetName(effName);
-//	effEta->SetTitle("0.5 < |y| < 1; p_{T}; Efficiency");
 
 	TEfficiency * effEtad = new TEfficiency (*h_etad, *mch_etad);
-	sprintf(effName, "altro4_effvsY_%s", partName);
+	sprintf(effName, "altro4_effvsY");
 	effEtad->SetName(effName);
-//	effEta->SetTitle("p_{T} > 0.1 GeV; y; Efficiency");
 
 	TEfficiency * effPtd = new TEfficiency (*h_pt1d, *mch_pt1d);
-	sprintf(effName, "altro4_effvsPt_Y1_%s", partName);
+	sprintf(effName, "altro4_effvsPt_Y1");
 	effPtd->SetName(effName);
-//	effEta->SetTitle("|y| < 0.5; p_{T}; Efficiency");
 
 	TEfficiency * effPt1d = new TEfficiency (*h_pt2d, *mch_pt2d);
-	sprintf(effName, "altro4_effvsPt_Y2_%s", partName);
+	sprintf(effName, "altro4_effvsPt_Y2");
 	effPt1d->SetName(effName);
-//	effEta->SetTitle("0.5 < |y| < 1; p_{T}; Efficiency");
 
 
 //	-------------------------------------------------------------------
 	drawHists(effEtad, effEta, "effEta", "p_{T} > 0.1 GeV/c;#eta;Efficiency");
+	drawHists(effPtd_Full, effPt_Full, "effPt_Full", "|#eta| < 1.5;p_{T};Efficiency");
 	drawHists(effPtd, effPt, "effPt", "|#eta| < 0.5;p_{T};Efficiency");
 	drawHists(effPt1d, effPt1, "effPt1", "0.5 < |#eta| < 1;p_{T};Efficiency");
 //	-------------------------------------------------------------------
@@ -181,11 +190,14 @@ void efficiency()
 
 int main()
 	{
-	altro3 = branchToVec("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/y2014_Altro_3_Out.rectree.root", "pTracks");
-	mcaltro3 = branchToVec("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/y2014_Altro_3_Out.rectree.root", "mcTracks");
+	const char file1[200] = "/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/full_y2014_Altro3_ZeroBias_Embeding.list.rectree.root";
+	const char file2[200] = "/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/full_y2014_Altro4_ZeroBias_Embeding.list.rectree.root";
 
-	altro4 = branchToVec("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/y2014_Altro_4_Out.rectree.root", "pTracks");
-	mcaltro4 = branchToVec("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/y2014_Altro_4_Out.rectree.root", "mcTracks");
+	altro3 = branchToVec(file1, "pTracks");
+	mcaltro3 = branchToVec(file1, "mcTracks");
+
+	altro4 = branchToVec(file2, "pTracks");
+	mcaltro4 = branchToVec(file2, "mcTracks");
 
 	efficiency();
 	return 1;
