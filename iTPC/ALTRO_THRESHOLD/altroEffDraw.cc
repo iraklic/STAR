@@ -11,6 +11,9 @@
 #include "TEfficiency.h"
 #include "TLegend.h"
 #include "TFile.h"
+#include <fstream>
+#include "TF1.h"
+#include "TGraph.h"
 
 using namespace std;
 
@@ -23,34 +26,108 @@ struct var
 	float rapidity;
 	};
 
-vector<var> altro3;
-vector<var> mcaltro3;
-vector<var> altro4;
-vector<var> mcaltro4;
+struct myEffSet
+	{
+	TEfficiency * etaEff;
+	TEfficiency * ptEffCentral;
+	TEfficiency * ptEffForward;
+	TEfficiency * ptEffFull;
+	};
 
-template <class histObject>
-void drawHists(histObject h1, histObject h2, const char * name, const char * titles)
+void drawHists(vector<myEffSet> vec, vector<string> name)
 	{
 	TFile * myFile = new TFile("altro.root", "RECREATE");
 	char outName[100];
-	TCanvas * c = new TCanvas();
-	c->Clear();
-	h1->Draw();
-	h1->SetTitle(titles);
-	h2->SetLineColor(2);
-	h2->Draw("same");
+	TLegend * leg = new TLegend(0.1, 0.1, 0.4, 0.6);
+	TCanvas * cEta = new TCanvas();
+	TCanvas * cPtFull = new TCanvas();
+	TCanvas * cPtCentral = new TCanvas();
+	TCanvas * cPtForward = new TCanvas();
 
-	TLegend * leg = new TLegend(0.1, 0.1, 0.3, 0.3);
-	leg->AddEntry(h1, "Altro thr = 4", "pl");
-	leg->AddEntry(h2, "Altro thr = 3", "pl");
+	TF1 * fit = new TF1("fit", "pol0", 1, 3);
+
+	double yPt[vec.size()];
+	double xPt[vec.size()];
+
+	double fitPars[1];
+
+	for (int i = 0; i < vec.size(); i++)
+		{
+		cEta->cd();
+		if (i == 0) vec[i].etaEff->Draw();
+		else
+			{
+			vec[i].etaEff->SetMarkerColor(i+1);
+			vec[i].etaEff->SetLineColor(i+1);
+			vec[i].etaEff->Draw("same");
+			}
+		cPtFull->cd();
+
+		fit->SetLineColor(i+1);
+		vec[i].ptEffFull->Fit(fit, "QR");
+		yPt[i] = fit->GetParameter(0);
+		xPt[i] = i + 3;
+		if (i == 0) vec[i].ptEffFull->Draw();
+		else
+			{
+			vec[i].ptEffFull->SetMarkerColor(i+1);
+			vec[i].ptEffFull->SetLineColor(i+1);
+			vec[i].ptEffFull->Draw("same");
+			}
+		cPtCentral->cd();
+
+		if (i == 0) vec[i].ptEffCentral->Draw();
+		else
+			{
+			vec[i].ptEffCentral->SetMarkerColor(i+1);
+			vec[i].ptEffCentral->SetLineColor(i+1);
+			vec[i].ptEffCentral->Draw("same");
+			}
+		cPtForward->cd();
+
+		if (i == 0) vec[i].ptEffForward->Draw();
+		else
+			{
+			vec[i].ptEffForward->SetMarkerColor(i+1);
+			vec[i].ptEffForward->SetLineColor(i+1);
+			vec[i].ptEffForward->Draw("same");
+			}
+
+		leg->AddEntry(vec[i].etaEff, name[i].c_str(), "pl");
+		vec[i].etaEff->Write();
+		}
+	cEta->cd();
 	leg->Draw();
+	sprintf(outName, "effEta.gif");
+	cEta->SaveAs(outName);
 
-	sprintf(outName, "%s.gif", name);
-	c->SaveAs(outName);
-	delete c;
+	cPtFull->cd();
+	leg->Draw();
+	sprintf(outName, "effPtFull.gif");
+	cPtFull->SaveAs(outName);
 
-	h1->Write();
-	h2->Write();
+	cPtCentral->cd();
+	leg->Draw();
+	sprintf(outName, "effPtCentral.gif");
+	cPtCentral->SaveAs(outName);
+
+	cPtForward->cd();
+	leg->Draw();
+	sprintf(outName, "effPtForward.gif");
+	cPtForward->SaveAs(outName);
+
+	TCanvas * c  = new TCanvas();
+	TGraph * gr = new TGraph(vec.size(), xPt, yPt);
+	gr->Draw("apl");
+	gr->GetXaxis()->SetTitle("Altro Threshold");
+	gr->GetYaxis()->SetTitle("Efficiency");
+	c->SaveAs("efficiencies.gif");
+
+	delete cEta;
+	delete cPtFull;
+	delete cPtCentral;
+	delete cPtForward;
+
 	myFile->Close();
 	}
 
@@ -90,115 +167,82 @@ vector<var> branchToVec(const char * file, const char * branch)
 	return vec;
 	}
 
-void efficiency()
+myEffSet efficiency(vector<var> tracks, vector<var> mctracks, string name)
 	{
+	myEffSet effs;
 	double ptCut = 0.1;
 
 //	altro3
 	TH2F * ptEta = new TH2F ("ptEtaaltro3", "altro3 p_{T} vs. #eta", 100, -2, 2, 100, 0, 3);
 	TH2F * mcptEta = new TH2F ("mcptEtaaltro3", "altro3 MC p_{T} vs. #eta", 100, -2, 2, 100, 0, 3);
 
-	for (vector<var>::iterator it = altro3.begin(); it != altro3.end(); it++)
+	for (vector<var>::iterator it = tracks.begin(); it != tracks.end(); it++)
 		if (it->pid == 7 || it->pid == 8) ptEta->Fill(it->eta, it->pt);
 
-	for (vector<var>::iterator it = mcaltro3.begin(); it != mcaltro3.end(); it++)
+	for (vector<var>::iterator it = mctracks.begin(); it != mctracks.end(); it++)
 		if (it->pid == 7 || it->pid == 8) mcptEta->Fill(it->eta, it->pt);
 
-	TH1D * h_eta = ptEta->ProjectionX("etaaltro3", ptEta->ProjectionY()->FindBin(ptCut), 100);
-	TH1D * mch_eta = mcptEta->ProjectionX("mcetaaltro3", mcptEta->ProjectionY()->FindBin(ptCut), 100);
+	TH1D * h_eta = ptEta->ProjectionX("tracksEta", ptEta->ProjectionY()->FindBin(ptCut), 100);
+	TH1D * mch_eta = mcptEta->ProjectionX("mcetracksEta", mcptEta->ProjectionY()->FindBin(ptCut), 100);
 
-	TH1D * h_pt = ptEta->ProjectionY("ptaltro3_F", ptEta->ProjectionX()->FindBin(-1.5), ptEta->ProjectionX()->FindBin(1.5));
-	TH1D * mch_pt = mcptEta->ProjectionY("mcptaltro3_F", mcptEta->ProjectionX()->FindBin(-1.5), mcptEta->ProjectionX()->FindBin(1.5));
+	TH1D * h_pt_Full = ptEta->ProjectionY("tracksPt_Full", ptEta->ProjectionX()->FindBin(-1.0), ptEta->ProjectionX()->FindBin(1.0));
+	TH1D * mch_pt_Full = mcptEta->ProjectionY("mctracks_pt_Full", mcptEta->ProjectionX()->FindBin(-1.0), mcptEta->ProjectionX()->FindBin(1.0));
 
-	TH1D * h_pt1 = ptEta->ProjectionY("ptaltro3_1", ptEta->ProjectionX()->FindBin(-0.5), ptEta->ProjectionX()->FindBin(0.5));
-	TH1D * mch_pt1 = mcptEta->ProjectionY("mcptaltro3_1", mcptEta->ProjectionX()->FindBin(-0.5), mcptEta->ProjectionX()->FindBin(0.5));
+	TH1D * h_pt = ptEta->ProjectionY("tracksPt", ptEta->ProjectionX()->FindBin(-0.5), ptEta->ProjectionX()->FindBin(0.5));
+	TH1D * mch_pt = mcptEta->ProjectionY("mctracksPt", mcptEta->ProjectionX()->FindBin(-0.5), mcptEta->ProjectionX()->FindBin(0.5));
 
-	TH1D * h_pt2 = ptEta->ProjectionY("ptaltro3_2", ptEta->ProjectionX()->FindBin(-1.0), ptEta->ProjectionX()->FindBin(-0.5));
-	TH1D * mch_pt2 = mcptEta->ProjectionY("mcptaltro3_2", mcptEta->ProjectionX()->FindBin(-1.0), mcptEta->ProjectionX()->FindBin(-0.5));
+	TH1D * h_pt1 = ptEta->ProjectionY("tracksPt_1", ptEta->ProjectionX()->FindBin(-1.0), ptEta->ProjectionX()->FindBin(-0.5));
+	TH1D * mch_pt1 = mcptEta->ProjectionY("mctracksPt_1", mcptEta->ProjectionX()->FindBin(-1.0), mcptEta->ProjectionX()->FindBin(-0.5));
 
-	TH1D * h_pt3 = ptEta->ProjectionY("ptaltro3_3", ptEta->ProjectionX()->FindBin(0.5), ptEta->ProjectionX()->FindBin(1.0));
-	TH1D * mch_pt3 = mcptEta->ProjectionY("mcptaltro3_3", mcptEta->ProjectionX()->FindBin(0.5), ptEta->ProjectionX()->FindBin(1.0));
+	TH1D * h_pt2 = ptEta->ProjectionY("tracksPt_2", ptEta->ProjectionX()->FindBin(0.5), ptEta->ProjectionX()->FindBin(1.0));
+	TH1D * mch_pt2 = mcptEta->ProjectionY("mctracksPt_2", mcptEta->ProjectionX()->FindBin(0.5), ptEta->ProjectionX()->FindBin(1.0));
 
-	h_pt2->Add(h_pt3);
-	mch_pt2->Add(h_pt3);
-
-//	altro4
-	TH2F * ptEtad = new TH2F ("ptEtaaltro4", "altro4 p_{T} vs. #eta", 100, -2, 2, 100, 0, 3);
-	TH2F * mcptEtad = new TH2F ("mcptEtaaltro4", "altro4 MC p_{T} vs. #eta", 100, -2, 2, 100, 0, 3);
-
-	for (vector<var>::iterator it = altro4.begin(); it != altro4.end(); it++)
-			if (it->pid == 7 || it->pid == 8) ptEtad->Fill(it->eta, it->pt);
-
-	for (vector<var>::iterator it = mcaltro4.begin(); it != mcaltro4.end(); it++)
-			if (it->pid == 7 || it->pid == 8) mcptEtad->Fill(it->eta, it->pt);
-
-	TH1D * h_etad = ptEtad->ProjectionX("etaaltro4", ptEtad->ProjectionY()->FindBin(ptCut), 100);
-	TH1D * mch_etad = mcptEtad->ProjectionX("mcetaaltro4", mcptEtad->ProjectionY()->FindBin(ptCut), 100);
-
-	TH1D * h_ptd = ptEtad->ProjectionY("ptaltro4_F", ptEtad->ProjectionX()->FindBin(-1.5), ptEtad->ProjectionX()->FindBin(1.5));
-	TH1D * mch_ptd = mcptEtad->ProjectionY("mcptaltro4_F", mcptEtad->ProjectionX()->FindBin(-1.5), mcptEtad->ProjectionX()->FindBin(1.5));
-
-	TH1D * h_pt1d = ptEtad->ProjectionY("ptaltro4_1", ptEtad->ProjectionX()->FindBin(-0.5), ptEtad->ProjectionX()->FindBin(0.5));
-	TH1D * mch_pt1d = mcptEtad->ProjectionY("mcptaltro4_1", mcptEtad->ProjectionX()->FindBin(-0.5), mcptEtad->ProjectionX()->FindBin(0.5));
-
-	TH1D * h_pt2d = ptEtad->ProjectionY("ptaltro4_2", ptEtad->ProjectionX()->FindBin(-1.0), ptEtad->ProjectionX()->FindBin(-0.5));
-	TH1D * mch_pt2d = mcptEtad->ProjectionY("mcptaltro4_2", mcptEtad->ProjectionX()->FindBin(-1.0), mcptEtad->ProjectionX()->FindBin(-0.5));
-
-	TH1D * h_pt3d = ptEtad->ProjectionY("ptaltro4_3", ptEtad->ProjectionX()->FindBin(0.5), ptEtad->ProjectionX()->FindBin(1.0));
-	TH1D * mch_pt3d = mcptEtad->ProjectionY("mcptaltro4_3", mcptEtad->ProjectionX()->FindBin(0.5), mcptEtad->ProjectionX()->FindBin(1.0));
-
-	h_pt2d->Add(h_pt3d);
-	mch_pt2d->Add(h_pt3d);
+	h_pt1->Add(h_pt2);
+	mch_pt1->Add(h_pt2);
 
 	char effName[200];
 
-	TEfficiency * effEta = new TEfficiency (*h_eta, *mch_eta);
-	sprintf(effName, "altro3_effvsY");
-	effEta->SetName(effName);
+	effs.etaEff = new TEfficiency (*h_eta, *mch_eta);
+	sprintf(effName, "%s_effvsY", name.c_str());
+	effs.etaEff->SetName(effName);
 
-	TEfficiency * effPt_Full = new TEfficiency (*h_pt, *mch_pt);
-	TEfficiency * effPtd_Full = new TEfficiency (*h_ptd, *mch_ptd);
-
-	TEfficiency * effPt = new TEfficiency (*h_pt1, *mch_pt1);
-	sprintf(effName, "altro3_effvsPt_Y1");
-	effPt->SetName(effName);
-
-	TEfficiency * effPt1 = new TEfficiency (*h_pt2, *mch_pt2);
-	sprintf(effName, "altro3_effvsPt_Y2");
-	effPt1->SetName(effName);
-
-	TEfficiency * effEtad = new TEfficiency (*h_etad, *mch_etad);
-	sprintf(effName, "altro4_effvsY");
-	effEtad->SetName(effName);
-
-	TEfficiency * effPtd = new TEfficiency (*h_pt1d, *mch_pt1d);
-	sprintf(effName, "altro4_effvsPt_Y1");
-	effPtd->SetName(effName);
-
-	TEfficiency * effPt1d = new TEfficiency (*h_pt2d, *mch_pt2d);
-	sprintf(effName, "altro4_effvsPt_Y2");
-	effPt1d->SetName(effName);
+	effs.ptEffFull = new TEfficiency (*h_pt, *mch_pt);
+	sprintf(effName, "%s_effvsPt_Full", name.c_str());
+	effs.ptEffFull->SetName(effName);
 
 
-//	-------------------------------------------------------------------
-	drawHists(effEtad, effEta, "effEta", "p_{T} > 0.1 GeV/c;#eta;Efficiency");
-	drawHists(effPtd_Full, effPt_Full, "effPt_Full", "|#eta| < 1.5;p_{T};Efficiency");
-	drawHists(effPtd, effPt, "effPt", "|#eta| < 0.5;p_{T};Efficiency");
-	drawHists(effPt1d, effPt1, "effPt1", "0.5 < |#eta| < 1;p_{T};Efficiency");
-//	-------------------------------------------------------------------
+	effs.ptEffCentral = new TEfficiency (*h_pt1, *mch_pt1);
+	sprintf(effName, "%s_effvsPt_Central", name.c_str());
+	effs.ptEffCentral->SetName(effName);
+
+	effs.ptEffForward = new TEfficiency (*h_pt2, *mch_pt2);
+	sprintf(effName, "%s_effvsPt_Forward", name.c_str());
+	effs.ptEffForward->SetName(effName);
+
+	return effs;
 	}
-
-int main()
+int main(int argc, char * argv[])
 	{
-	const char file1[200] = "/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/full_y2014_Altro3_ZeroBias_Embeding.list.rectree.root";
-	const char file2[200] = "/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/full_y2014_Altro4_ZeroBias_Embeding.list.rectree.root";
+	ifstream infile(argv[1]);
+	char file[200];
+	char type[200];
 
-	altro3 = branchToVec(file1, "pTracks");
-	mcaltro3 = branchToVec(file1, "mcTracks");
+	vector<vector<var> > inData;
+	vector<vector<var> > mcInData;
+	vector<string> types;
 
-	altro4 = branchToVec(file2, "pTracks");
-	mcaltro4 = branchToVec(file2, "mcTracks");
+	while (infile >> file >> type)
+		{
+		inData.push_back(branchToVec(file, "pTracks"));
+		mcInData.push_back(branchToVec(file, "mcTracks"));
+		types.push_back(type);
+		}
 
-	efficiency();
+	vector<myEffSet> effVec;
+
+	for (int i = 0; i < types.size(); i++)
+		effVec.push_back(efficiency(inData[i], mcInData[i], types[i]));
+
+	drawHists(effVec, types);
 	return 1;
 	}
