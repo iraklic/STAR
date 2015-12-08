@@ -6,11 +6,14 @@
 #include <fstream>
 
 #include "TCanvas.h"
+#include "TTree.h"
 #include "TROOT.h"
+#include "TMath.h"
 #include "TApplication.h"
 #include "TFile.h"
 #include "TH1F.h"
 #include "TH2F.h"
+#include "TH3F.h"
 #include "TProfile.h"
 #include "TSystem.h"
 #include "TStyle.h"
@@ -34,18 +37,21 @@
 #include "Plotting.hh"
 //#define __DriftVelocity__
 using namespace Garfield;
+using namespace std;
 TFile *fOut = 0;
 //________________________________________________________________________________
-void verticalWall(ComponentAnalyticField* comp, double x, double yMin, double yMax, double step, double voltage, const char * name)
+void verticalWall(ComponentAnalyticField* comp, double x, double yMin, double yMax, double voltage, const char * name)
 	{
+	double step = 0.011;
 	double dPseudoWire = 0.01;
 
 	int numberOfWires = (yMax - yMin) / step;
 	for (double y = yMin; y < yMax; y += step)
 		comp->AddWire(x, y, dPseudoWire, voltage, name);
 	}
-void horizontalWall(ComponentAnalyticField* comp, double xMin, double xMax, double y, double step, double voltage, const char * name)
+void horizontalWall(ComponentAnalyticField* comp, double xMin, double xMax, double y, double voltage, const char * name)
 	{
+	double step = 0.011;
 	double dPseudoWire = 0.01;
 
 	int numberOfWires = (xMax - xMin) / step;
@@ -78,6 +84,7 @@ void TPCAnodeWires(ComponentAnalyticField* comp, const Char_t *setup,
 	const Char_t *s[3] = {"s","S","Z"};
 	Double_t x;
 	Int_t c = 0;
+
 	for (Int_t i = 0; i <= na; ++i)
 		{
 		x = xW + aWpitch*i;
@@ -102,6 +109,8 @@ void TPCAnodeWires(ComponentAnalyticField* comp, const Char_t *setup,
 //________________________________________________________________________________
 void tpcGL(Int_t nEvents = 0, const Char_t *OutName = "GL.root", TString geoName = "PWD")
 	{
+	bool onlyIons = true;
+
 	TString Geometry;
 	if (geoName == "PWD")
 		{
@@ -370,6 +379,10 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 	Double_t  ySens[2] = {yFG + gap[0], yFG + gap[1]};
 	Double_t   yPad[2] = {ySens[0] + gap[0], ySens[1] + gap[1]};
 	Double_t x;
+
+//	FILE * coordsFile;
+//	coordsFile = fopen("coords.txt", "w");
+
 	for (Int_t io = 0; io < 2; io++)
 		{
 //		Inner/Outer Loop
@@ -377,7 +390,9 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 		for (Int_t i = 0; i <= ng[io]; ++i)
 			{
 			x = xGGmin[io] + ggWpitch*i;
+//			if (!io) fprintf(coordsFile, "%f\n", x);
 			if (x < xmin || x > xmax) continue;
+
 			Double_t v = vGG + dvGG*(1 - 2*((i + io)%2)); // GG Closed
 //			Double_t v = vGG; // GG Open
 			if (io == 0 && i == ng[io]) {cout << "The last  GG wire Inner Sector potential " << v << endl;}
@@ -436,6 +451,7 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 				x = xSBmin[io] + dPseudo*(2*i + 0.5);
 				if (x < xmin || x > xmax) continue;
 				comp->AddWire(x, yPad[io], dPseudo, vPad, "P");
+//				fprintf(coordsFile, "fake pad : %f - %f - %f\n", x, yPad[io], dPseudo);
 				}
 			}
 		else
@@ -443,21 +459,22 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 			comp->AddPlaneY(yPad[io], vPad, "p");
 			}
 		} // Inner / Outer Loop
-
+//	fclose(coordsFile);
 
 	Double_t Xmin = xGGmin[0] + ggWpitch*2 + ggWpitch*ng[0] + 0.2; // 2 mm safety margin
 	Double_t Xmax = xGGmin[1] - ggWpitch*2 - 0.2;
 	Double_t Xmean= 0.5*(Xmin + Xmax);
 	Double_t xstep = 0.0100;
 
+//	bring wall of wires down to the level of the outer padplane
+	double padStep = 0.011;
+	verticalWall(comp, xSBmax[0] + padStep, yPad[0], yPad[1] - padStep / 2, vPad, "innerPadToOuterPadRadius");
+	comp->AddReadout("innerPadToOuterPadRadius");
+
 //	======================= MY GEOMETRY ================================================
 	if (Geometry.BeginsWith("myGeo_V01"))
 		{
 		double step = 0.011;
-
-//		bring wall of wires down to the level of the outer padplane
-		verticalWall(comp, xSBmax[0] + step, yPad[0], yPad[1] - step / 2, step, vPad, "innerPadToOuterPadRadius");
-		comp->AddReadout("innerPadToOuterPadRadius");
 
 //		Inner Wall
 		double myV = -40; 
@@ -469,34 +486,30 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 		double topY = myY + dXWall / 2 - step / 2;
 		double lowY = myY - dXWall / 2 + step / 2;
 
-		verticalWall(comp, xSBmax[0] - dXWall + step / 2,	topY, yPad[0] - step, step, myV, "myWall_Inner");
-		verticalWall(comp, xSBmax[0] - step / 2,		lowY, yPad[0] - step, step, myV, "myWall_Inner");
+		verticalWall(comp, xSBmax[0] - dXWall + step / 2,	topY, yPad[0] - step, myV, "myWall_Inner");
+		verticalWall(comp, xSBmax[0] - step / 2,		lowY, yPad[0] - step, myV, "myWall_Inner");
 
-		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - dXWall - step / 2,	topY, step, myV, "myWall_Inner");
-		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - step,			lowY, step, myV, "myWall_Inner");
+		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - dXWall - step / 2,	topY, myV, "myWall_Inner");
+		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - step,			lowY, myV, "myWall_Inner");
 
-		verticalWall(comp, xMaxInnerGGWire - 0.5 - step, lowY, topY, step, myV, "myWall_Inner");
+		verticalWall(comp, xMaxInnerGGWire - 0.5 - step, lowY, topY, myV, "myWall_Inner");
 
 		comp->AddReadout("myWall_Inner");
 
 //		Outer Wall
-		verticalWall(comp, xSBmin[1] + dXWall - step / 2,	topY, yPad[1] - step / 2, step, myV, "myWall_Outer");
-		verticalWall(comp, xSBmin[1] + step / 2,		lowY, yPad[1] - step / 2, step, myV, "myWall_Outer");
+		verticalWall(comp, xSBmin[1] + dXWall - step / 2,	topY, yPad[1] - step / 2, myV, "myWall_Outer");
+		verticalWall(comp, xSBmin[1] + step / 2,		lowY, yPad[1] - step / 2, myV, "myWall_Outer");
 
-		horizontalWall(comp, xSBmin[1] + dXWall + step / 2,	xMinOuterGGWire + 0.5, topY, step, myV, "myWall_Outer");
-		horizontalWall(comp, xSBmin[1] + 3 * step / 2,		xMinOuterGGWire + 0.5, lowY, step, myV, "myWall_Outer");
+		horizontalWall(comp, xSBmin[1] + dXWall + step / 2,	xMinOuterGGWire + 0.5, topY, myV, "myWall_Outer");
+		horizontalWall(comp, xSBmin[1] + 3 * step / 2,		xMinOuterGGWire + 0.5, lowY, myV, "myWall_Outer");
 
-		verticalWall(comp, xMinOuterGGWire + 0.5 + step, lowY, topY, step, myV, "myWall_Outer");
+		verticalWall(comp, xMinOuterGGWire + 0.5 + step, lowY, topY, myV, "myWall_Outer");
 
 		comp->AddReadout("myWall_Outer");
 		}
 	else if (Geometry.BeginsWith("myGeo_V02"))
 		{
 		double step = 0.011;
-
-//		bring wall of wires down to the level of the outer padplane
-		verticalWall(comp, xSBmax[0] + step, yPad[0], yPad[1] - step / 2, step, vPad, "innerPadToOuterPadRadius");
-		comp->AddReadout("innerPadToOuterPadRadius");
 
 //		Inner Wall
 		double myV = -190; 
@@ -508,24 +521,24 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 		double topY = myY + dXWall / 2 - step / 2;
 		double lowY = myY - dXWall / 2 + step / 2;
 
-		verticalWall(comp, xSBmax[0] - dXWall + step / 2,	topY, yPad[0] - step, step, myV, "myWall_Inner");
-		verticalWall(comp, xSBmax[0] - step / 2,		lowY, yPad[0] - step, step, myV, "myWall_Inner");
+		verticalWall(comp, xSBmax[0] - dXWall + step / 2,	topY, yPad[0] - step, myV, "myWall_Inner");
+		verticalWall(comp, xSBmax[0] - step / 2,		lowY, yPad[0] - step, myV, "myWall_Inner");
 
-		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - dXWall - step / 2,	topY, step, myV, "myWall_Inner");
-		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - step,			lowY, step, myV, "myWall_Inner");
+		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - dXWall - step / 2,	topY, myV, "myWall_Inner");
+		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - step,			lowY, myV, "myWall_Inner");
 
-		verticalWall(comp, xMaxInnerGGWire - 0.5 - step, lowY, topY, step, myV, "myWall_Inner");
+		verticalWall(comp, xMaxInnerGGWire - 0.5 - step, lowY, topY, myV, "myWall_Inner");
 
 		comp->AddReadout("myWall_Inner");
 
 //		Outer Wall
-		verticalWall(comp, xSBmin[1] + dXWall - step / 2,	topY, yPad[1] - step / 2, step, myV, "myWall_Outer");
-		verticalWall(comp, xSBmin[1] + step / 2,		lowY, yPad[1] - step / 2, step, myV, "myWall_Outer");
+		verticalWall(comp, xSBmin[1] + dXWall - step / 2,	topY, yPad[1] - step / 2, myV, "myWall_Outer");
+		verticalWall(comp, xSBmin[1] + step / 2,		lowY, yPad[1] - step / 2, myV, "myWall_Outer");
 
-		horizontalWall(comp, xSBmin[1] + dXWall + step / 2,	xMinOuterGGWire + 0.5, topY, step, myV, "myWall_Outer");
-		horizontalWall(comp, xSBmin[1] + 3 * step / 2,		xMinOuterGGWire + 0.5, lowY, step, myV, "myWall_Outer");
+		horizontalWall(comp, xSBmin[1] + dXWall + step / 2,	xMinOuterGGWire + 0.5, topY, myV, "myWall_Outer");
+		horizontalWall(comp, xSBmin[1] + 3 * step / 2,		xMinOuterGGWire + 0.5, lowY, myV, "myWall_Outer");
 
-		verticalWall(comp, xMinOuterGGWire + 0.5 + step, lowY, topY, step, myV, "myWall_Outer");
+		verticalWall(comp, xMinOuterGGWire + 0.5 + step, lowY, topY, myV, "myWall_Outer");
 
 		comp->AddReadout("myWall_Outer");
 		}
@@ -533,10 +546,6 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 		{
 		dXWall = 0.08;
 		double step = 0.011;
-
-//		bring wall of wires down to the level of the outer padplane
-		verticalWall(comp, xSBmax[0] + step, yPad[0], yPad[1] - step / 2, step, vPad, "innerPadToOuterPadRadius");
-		comp->AddReadout("innerPadToOuterPadRadius");
 
 //		Inner Wall
 		double myV = 0; 
@@ -548,31 +557,48 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 		double topY = myY + dXWall / 2 - step / 2;
 		double lowY = myY - dXWall / 2 + step / 2;
 
-		verticalWall(comp, xSBmax[0] - dXWall + step / 2,	topY, yPad[0] - step, step, myV, "myWall_Inner");
-		verticalWall(comp, xSBmax[0] - step / 2,		lowY, yPad[0] - step, step, myV, "myWall_Inner");
+		verticalWall(comp, xSBmax[0] - dXWall + step / 2,	topY, yPad[0] - step, myV, "myWall_Inner");
+		verticalWall(comp, xSBmax[0] - step / 2,		lowY, yPad[0] - step, myV, "myWall_Inner");
 
-		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - dXWall - step / 2,	topY, step, myV, "myWall_Inner");
-		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - step,			lowY, step, myV, "myWall_Inner");
+		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - dXWall - step / 2,	topY, myV, "myWall_Inner");
+		horizontalWall(comp, xMaxInnerGGWire - 0.5, xSBmax[0] - step,			lowY, myV, "myWall_Inner");
 
-		verticalWall(comp, xMaxInnerGGWire - 0.5 - step, lowY, topY, step, myV, "myWall_Inner");
+		verticalWall(comp, xMaxInnerGGWire - 0.5 - step, lowY, topY, myV, "myWall_Inner");
 
 		comp->AddReadout("myWall_Inner");
 
 //		Outer Wall
-		verticalWall(comp, xSBmin[1] + dXWall - step / 2,	topY, yPad[1] - step / 2, step, myV, "myWall_Outer");
-		verticalWall(comp, xSBmin[1] + step / 2,		lowY, yPad[1] - step / 2, step, myV, "myWall_Outer");
+		verticalWall(comp, xSBmin[1] + dXWall - step / 2,	topY, yPad[1] - step / 2, myV, "myWall_Outer");
+		verticalWall(comp, xSBmin[1] + step / 2,		lowY, yPad[1] - step / 2, myV, "myWall_Outer");
 
-		horizontalWall(comp, xSBmin[1] + dXWall + step / 2,	xMinOuterGGWire + 0.5, topY, step, myV, "myWall_Outer");
-		horizontalWall(comp, xSBmin[1] + 3 * step / 2,		xMinOuterGGWire + 0.5, lowY, step, myV, "myWall_Outer");
+		horizontalWall(comp, xSBmin[1] + dXWall + step / 2,	xMinOuterGGWire + 0.5, topY, myV, "myWall_Outer");
+		horizontalWall(comp, xSBmin[1] + 3 * step / 2,		xMinOuterGGWire + 0.5, lowY, myV, "myWall_Outer");
 
-		verticalWall(comp, xMinOuterGGWire + 0.5 + step, lowY, topY, step, myV, "myWall_Outer");
+		verticalWall(comp, xMinOuterGGWire + 0.5 + step, lowY, topY, myV, "myWall_Outer");
 
 		comp->AddReadout("myWall_Outer");
 		}
+	else if (Geometry.BeginsWith("myGeo_V05"))
+		{
+		dXWall = 0.18;
+		double step = 0.011;
 
+//		position at myV
+		double myY = (yFG + yGG) / 2;
 
+		verticalWall(comp, xSBmax[0] + dXWall - step / 2,	myY, yPad[1] - step, -230, "myWall");
+		verticalWall(comp, xSBmax[0] + step / 2,		myY, yPad[0] - step, 0, "myWall");
+
+		verticalWall(comp, xSBmax[0] + dXWall - step / 2,	yGG, myY - step, vGG, "myWall");
+		verticalWall(comp, xSBmax[0] + step / 2,		yGG, myY - step, vGG, "myWall");
+
+		horizontalWall(comp, xSBmax[0] + 1.5 * step, xSBmax[0] + dXWall - 1.5 * step, yGG, vGG, "myWall");
+
+		comp->AddReadout("myWall");
+		}
+	cout << "AT THIS POINT GEOMETRY IS CONSTRUCTED!!!" << endl;
 //	======================= END OF MY GEOMETRY =========================================
-
+/*
 	if (Geometry.Contains("TShape"))
 		{
 //		extra cathode wire to close the gap
@@ -821,6 +847,7 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 				}
 			}
 		}
+*/
 //	Cathode plane
 	comp->AddPlaneY(yC, vC, "q");
 	comp->AddReadout("s");
@@ -909,7 +936,24 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 	outName += Geometry; outName += "_";
 	outName += OutName;
 	fOut = new TFile(outName,"recreate");
+	TTree *  outTree = new TTree("Ions", "Ion Lifetime in TPC");
 	if (! fOut) return;
+
+//	Branches to be saved ======================
+	map<string, double> ionMap;
+	ionMap["X"];
+	ionMap["Y"];
+	ionMap["T"];
+
+	for (map<string, double>::iterator mi = ionMap.begin(); mi != ionMap.end(); mi++)
+		{
+		string name = mi->first;
+		string leafList = name + "/D";
+		outTree->Branch(name.c_str(), &(mi->second), leafList.c_str());
+		}
+
+//	===========================================
+
 	TH1F* hAngle = new TH1F("hAngle", "Angular distribution", nBinsAngular, -180, 180);
 	TH2F* hRadial = new TH2F("hRadial", "Ion starting points", nBinsRadial, dSens / 2., 3. * dSens, nBinsAngular, -180, 180);
 	TH1F* hElectrons = new TH1F("hElectrons", "Log_{10}(Number of electrons)", nBinsGain, 0, 5.);
@@ -927,6 +971,9 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 	TH1F *el_status = new TH1F("el_status","electron status", 41, -20, 20);
 	TH1F *ion_status = new TH1F("ion_status","ion status", 41, -20, 20);
 	TH1F *eX = new TH1F("eX","Initial electrons",100,xmin,xmax);
+
+//	TH3F * ionLifetime = new TH3F("ionLifetime", "ionLifetime", nx, xmin, xmax, 1000, 1000000, 10000000, 20, -0.1, 0.1);
+
 	TProfile *eXI = new TProfile("eXI","Total no of ion versus x of primary electron",100,xmin,xmax);
 	Double_t x0, y0, z0, t0, e0;
 	Double_t x1, y1, z1, t1, e1;
@@ -934,67 +981,151 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 	Double_t r, phi;
 	Int_t ne, ni;
 	Int_t nEndpoints;
-	for (Int_t i = nEvents; i--;)
+
+	if (!onlyIons)
 		{
-		if (i != nEvents) gBenchmark->Show("tpcGL");
-		gBenchmark->Reset();
-		gBenchmark->Start("tpcGL");
-		gas->ResetCollisionCounters();
-		sensor->NewSignal();
-
-/*		THIS IS COMMENTED OUT AND BELOW BLOCK IS ENABLED TO REMOVE IONS ALONG WITH SEEDED ELECTRONS
-		x0 = xmin + RndmUniform() * (xmax - xmin);
-		eX->Fill(x0);
-		y0 = yGG + 0.1;
-		z0 = t0 = 0.;
-		e0 = 0.1; // eV
-		t0 = 0;
-		aval->AvalancheElectron(x0, y0, z0, t0, e0, 0., 0., 0.);
-*/
-		Double_t xStart = xmin + RndmUniform() * (xmax - xmin);
-		eX->Fill(xStart);
-		Double_t yStart = yGG + 0.1;
-		Double_t zStart = 0;
-		Double_t tStart = 0.;
-		Double_t eStart = 0.1; // eV
-		aval->AvalancheElectron(xStart, yStart, zStart, tStart, eStart, 0., 0., 0.);
-
-//		v_e->Plot(true,false);
-//		c_e->Update();
-		aval->GetAvalancheSize(ne, ni);
-		if (ne > 0) hElectrons->Fill(TMath::Log10(ne));    
-		if (ni > 0) hIons->Fill(TMath::Log10(ni));
-		eXI->Fill(x0,ni);
-		nEndpoints = aval->GetNumberOfElectronEndpoints();
-//		if (i % 10 == 0) 
-		std::cout << i << "/" << nEvents << ": "
-			<< ne << " electrons, "
-			<< ni << " ions" << std::endl; 
-		if (ne <= 0) continue;
-		for (Int_t j = nEndpoints; j--;)
+		for (Int_t i = nEvents; i--;)
 			{
-			aval->GetElectronEndpoint(j, x0, y0, z0, t0, e0, x1, y1, z1, t1, e1, status);
-//			BLOCK BELOW ADDED TO REMOVE IONS FROM SEEDED ELECTRONS -------
-			Double_t dist0 = TMath::Sqrt((x0 - xStart)*(x0 - xStart) + (y0 - yStart)*(y0 - yStart) + (z0 - zStart)*(z0 - zStart));
-			Double_t dist1 = TMath::Sqrt((x1 - xStart)*(x1 - xStart) + (y1 - yStart)*(y1 - yStart) + (z1 - zStart)*(z1 - zStart));
-			if (dist0 < 1e-7 || dist1 < 1e-7) continue;
-//			--------------------------------------------------------------
+			if (i != nEvents) gBenchmark->Show("tpcGL");
+			gBenchmark->Reset();
+			gBenchmark->Start("tpcGL");
+			gas->ResetCollisionCounters();
+			sensor->NewSignal();
 
-			tElectrons->Fill(t1);
-			el_status->Fill(status);
+/*			THIS IS COMMENTED OUT AND BELOW BLOCK IS ENABLED TO REMOVE IONS ALONG WITH SEEDED ELECTRONS
+			x0 = xmin + RndmUniform() * (xmax - xmin);
+			eX->Fill(x0);
+			y0 = yGG + 0.1;
+			z0 = t0 = 0.;
+			e0 = 0.1; // eV
+			t0 = 0;
+			aval->AvalancheElectron(x0, y0, z0, t0, e0, 0., 0., 0.);
+*/
+			Double_t xStart = xmin + RndmUniform() * (xmax - xmin);
+			eX->Fill(xStart);
+//			Double_t yStart = yGG + 0.1; // Seeding above GG
+			Double_t yStart = (yGG + yFG) / 2 + 0.15; // Seeding above the L shaped wall notch
+
+			Double_t zStart = 0;
+			Double_t tStart = 0.;
+			Double_t eStart = 0.1; // eV
+			aval->AvalancheElectron(xStart, yStart, zStart, tStart, eStart, 0., 0., 0.);
+
+//			v_e->Plot(true,false);
+//			c_e->Update();
+			aval->GetAvalancheSize(ne, ni);
+			if (ne > 0) hElectrons->Fill(TMath::Log10(ne));    
+			if (ni > 0) hIons->Fill(TMath::Log10(ni));
+			eXI->Fill(x0,ni);
+			nEndpoints = aval->GetNumberOfElectronEndpoints();
+//			if (i % 10 == 0) 
+			cout << i << "/" << nEvents << ": " << ne << " electrons, " << ni << " ions" << std::endl; 
+			if (ne <= 0) continue;
+
+			for (Int_t j = nEndpoints; j--;)
+				{
+				aval->GetElectronEndpoint(j, x0, y0, z0, t0, e0, x1, y1, z1, t1, e1, status);
+//				BLOCK BELOW ADDED TO REMOVE IONS FROM SEEDED ELECTRONS -------
+				Double_t dist0 = TMath::Sqrt((x0 - xStart)*(x0 - xStart) + (y0 - yStart)*(y0 - yStart) + (z0 - zStart)*(z0 - zStart));
+				Double_t dist1 = TMath::Sqrt((x1 - xStart)*(x1 - xStart) + (y1 - yStart)*(y1 - yStart) + (z1 - zStart)*(z1 - zStart));
+				if (dist0 < 1e-7 || dist1 < 1e-7) continue;
+//				--------------------------------------------------------------
+
+				tElectrons->Fill(t1);
+				el_status->Fill(status);
+				Double_t X = (x1 + x0)/2;
+				Double_t Y = (y1 + y0)/2;
+				Double_t T = (t1 + t0)/2;
+				Double_t dX = x1 - x0;
+				Double_t dY = y1 - y0;
+				Double_t L = TMath::Sqrt(dX*dX + dY*dY);
+//				if (j == 0) continue;
+				xy_el->Fill(X,Y);
+				xy_elL->Fill(X,Y,L);
+				xy_elLT->Fill(X,Y,L*T);
+				driftline_i->DriftIon(x0, y0, z0, t0); // Seeding Ions where avalanche electrons are
+
+				const std::vector<DriftLineRKF::step> &path_i = driftline_i->path();
+				UInt_t nI = path_i.size();
+
+				double max_X = -999;
+				double max_Y = -999;
+				double max_T = -999;
+
+				for (auto step : path_i)
+					{
+					ion_status->Fill(step.status);
+					if (step.status) continue;
+				        X = (step.xf + step.xi)/2;
+				        Y = (step.yf + step.yi)/2;
+				        T = (step.tf + step.ti)/2;
+				        dX = step.xf - step.xi;
+				        dY = step.yf - step.yi;
+				        L = TMath::Sqrt(dX*dX + dY*dY);
+
+					xy_ion->Fill(X,Y);
+					xy_ionL->Fill(X,Y,L);
+					xy_ionLT->Fill(X,Y,L*T);
+
+					if (max_T < T)
+						{
+						max_T = T;
+						max_X = X;
+						max_Y = Y;
+						}
+					}
+//				ionLifetime->Fill(max_X, TMath::Log10(max_T), max_Y);
+//				ionLifetime->Fill(max_X, max_T, max_Y);
+
+				ionMap["X"] = max_X;
+				ionMap["Y"] = max_Y;
+				ionMap["T"] = max_T;
+				outTree->Fill();
+
+//				cout << max_X << " : " << TMath::Log10(max_T) << " : " <<  max_Y << endl;
+				}
+
+//			v_i->Plot(true,false);
+//			c_i->Update();
+//			std::cout << "Next avalanche..." << std::endl;
+			}
+		}
+//================================================================================
+//=== THIS IS TO ONLY SEED IONS RIGHT AWAY TO TEST ION CAPTURING ON GG ===========
+//================================================================================
+	else
+		{
+		for (Int_t i = nEvents; i--;)
+			{
+			if (i != nEvents) gBenchmark->Show("tpcGL");
+			gBenchmark->Reset();
+			gBenchmark->Start("tpcGL");
+			gas->ResetCollisionCounters();
+			sensor->NewSignal();
+
+			Double_t xStart = xmin + RndmUniform() * (xmax - xmin);
+			eX->Fill(xStart);
+
+			Double_t zStart = 0;
+			Double_t tStart = 0.;
+			Double_t eStart = 0.1; // eV
+
 			Double_t X = (x1 + x0)/2;
 			Double_t Y = (y1 + y0)/2;
 			Double_t T = (t1 + t0)/2;
 			Double_t dX = x1 - x0;
 			Double_t dY = y1 - y0;
 			Double_t L = TMath::Sqrt(dX*dX + dY*dY);
-//			if (j == 0) continue;
-			xy_el->Fill(X,Y);
-			xy_elL->Fill(X,Y,L);
-			xy_elLT->Fill(X,Y,L*T);
-			driftline_i->DriftIon(x0, y0, z0, t0);
-			const std::vector<DriftLineRKF::step> &path_i = driftline_i->path();
+
+			driftline_i->DriftIon(xStart, yStart, 0.04, 0); // Seeding Ions where avalanche electrons are
+
+			const vector<DriftLineRKF::step> &path_i = driftline_i->path();
 			UInt_t nI = path_i.size();
+
+			double max_X = -999;
+			double max_Y = -999;
+			double max_T = -999;
+
 			for (auto step : path_i)
 				{
 				ion_status->Fill(step.status);
@@ -1005,19 +1136,29 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 			        dX = step.xf - step.xi;
 			        dY = step.yf - step.yi;
 			        L = TMath::Sqrt(dX*dX + dY*dY);
+
 				xy_ion->Fill(X,Y);
 				xy_ionL->Fill(X,Y,L);
 				xy_ionLT->Fill(X,Y,L*T);
+
+				if (max_T < T)
+					{
+					max_T = T;
+					max_X = X;
+					max_Y = Y;
+					}
 				}
+			ionMap["X"] = max_X;
+			ionMap["Y"] = max_Y;
+			ionMap["T"] = max_T;
+			outTree->Fill();
 			}
-//		v_i->Plot(true,false);
-//		c_i->Update();
-//		std::cout << "Next avalanche..." << std::endl;
 		}
-	gBenchmark->Show("tpcGL");
+//	gBenchmark->Show("tpcGL");
 	fOut->Write();
 	if (gROOT->IsBatch())  gSystem->Abort();
 	}
+//================================================================================
 //________________________________________________________________________________
 void DrawFlux()
 	{
