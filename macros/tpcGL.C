@@ -97,6 +97,9 @@ void TPCAnodeWires(ComponentAnalyticField* comp, const Char_t *setup,
 			d = df;
 			c = 1;
 			}
+//		BELOW ONE LINE IS MOVIENG JUST ONE WIRE
+//		if (i > na - nf) x = x + 0.01;
+
 		if (zFLW && (i == 0 || i == na))
 			{
 			volt = 0;
@@ -109,7 +112,13 @@ void TPCAnodeWires(ComponentAnalyticField* comp, const Char_t *setup,
 //________________________________________________________________________________
 void tpcGL(Int_t nEvents = 0, const Char_t *OutName = "GL.root", TString geoName = "PWD")
 	{
-	bool onlyIons = true;
+	bool onlyIons = false;
+	if (onlyIons)
+		{
+		cout << "===================================" << endl;
+		cout << "==== !!! SEEDING ONLY IONS !!! ====" << endl;
+		cout << "===================================" << endl;
+		}
 
 	TString Geometry;
 	if (geoName == "PWD")
@@ -379,10 +388,6 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 	Double_t  ySens[2] = {yFG + gap[0], yFG + gap[1]};
 	Double_t   yPad[2] = {ySens[0] + gap[0], ySens[1] + gap[1]};
 	Double_t x;
-
-//	FILE * coordsFile;
-//	coordsFile = fopen("coords.txt", "w");
-
 	for (Int_t io = 0; io < 2; io++)
 		{
 //		Inner/Outer Loop
@@ -390,9 +395,7 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 		for (Int_t i = 0; i <= ng[io]; ++i)
 			{
 			x = xGGmin[io] + ggWpitch*i;
-//			if (!io) fprintf(coordsFile, "%f\n", x);
 			if (x < xmin || x > xmax) continue;
-
 			Double_t v = vGG + dvGG*(1 - 2*((i + io)%2)); // GG Closed
 //			Double_t v = vGG; // GG Open
 			if (io == 0 && i == ng[io]) {cout << "The last  GG wire Inner Sector potential " << v << endl;}
@@ -439,7 +442,6 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 				Int_t nf = 1;
 				TPCAnodeWires(comp, "Inner", xmin, xmax, na[io], nf, xGGmin[io] + ggWpitch*2, ySens[io], aWpitch, dSens, 4*dFW, vAnode[io], zFLW);
 				}
-
 			}
 //		Replace pad plane by wires for inner sector
 		if (!io)
@@ -451,7 +453,6 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 				x = xSBmin[io] + dPseudo*(2*i + 0.5);
 				if (x < xmin || x > xmax) continue;
 				comp->AddWire(x, yPad[io], dPseudo, vPad, "P");
-//				fprintf(coordsFile, "fake pad : %f - %f - %f\n", x, yPad[io], dPseudo);
 				}
 			}
 		else
@@ -459,7 +460,6 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 			comp->AddPlaneY(yPad[io], vPad, "p");
 			}
 		} // Inner / Outer Loop
-//	fclose(coordsFile);
 
 	Double_t Xmin = xGGmin[0] + ggWpitch*2 + ggWpitch*ng[0] + 0.2; // 2 mm safety margin
 	Double_t Xmax = xGGmin[1] - ggWpitch*2 - 0.2;
@@ -876,7 +876,7 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 		cellView->SetCanvas(c_e);
 		cellView->Plot2d();
 		if (nEvents == 0) c_e->SaveAs("/afs/rhic.bnl.gov/star/users/iraklic/WWW/Garfield/geometry.gif");
-#if 0    
+#if 0
 		c_i = new TCanvas("Cell_i","Cell for ions");
 		ViewCell *cellView_i = new ViewCell();
 		cellView_i->SetCanvas(c_i);
@@ -971,9 +971,6 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 	TH1F *el_status = new TH1F("el_status","electron status", 41, -20, 20);
 	TH1F *ion_status = new TH1F("ion_status","ion status", 41, -20, 20);
 	TH1F *eX = new TH1F("eX","Initial electrons",100,xmin,xmax);
-
-//	TH3F * ionLifetime = new TH3F("ionLifetime", "ionLifetime", nx, xmin, xmax, 1000, 1000000, 10000000, 20, -0.1, 0.1);
-
 	TProfile *eXI = new TProfile("eXI","Total no of ion versus x of primary electron",100,xmin,xmax);
 	Double_t x0, y0, z0, t0, e0;
 	Double_t x1, y1, z1, t1, e1;
@@ -1003,13 +1000,16 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 */
 			Double_t xStart = xmin + RndmUniform() * (xmax - xmin);
 			eX->Fill(xStart);
-//			Double_t yStart = yGG + 0.1; // Seeding above GG
-			Double_t yStart = (yGG + yFG) / 2 + 0.15; // Seeding above the L shaped wall notch
+			Double_t yStart = yGG + 0.1; // Seeding above GG
+//			Double_t yStart = yGG - 0.1; // Seeding belov GG
+//			Double_t yStart = (yGG + yFG) / 2 + 0.15; // Seeding above the L shaped wall notch
 
 			Double_t zStart = 0;
 			Double_t tStart = 0.;
 			Double_t eStart = 0.1; // eV
 			aval->AvalancheElectron(xStart, yStart, zStart, tStart, eStart, 0., 0., 0.);
+
+			cout << xStart << " : " << yStart << " : " << zStart << endl;
 
 //			v_e->Plot(true,false);
 //			c_e->Update();
@@ -1019,7 +1019,7 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 			eXI->Fill(x0,ni);
 			nEndpoints = aval->GetNumberOfElectronEndpoints();
 //			if (i % 10 == 0) 
-			cout << i << "/" << nEvents << ": " << ne << " electrons, " << ni << " ions" << std::endl; 
+			cout << i << "/" << nEvents << ": " << ne << " electrons, " << ni << " ions" << endl; 
 			if (ne <= 0) continue;
 
 			for (Int_t j = nEndpoints; j--;)
@@ -1044,7 +1044,6 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 				xy_elL->Fill(X,Y,L);
 				xy_elLT->Fill(X,Y,L*T);
 				driftline_i->DriftIon(x0, y0, z0, t0); // Seeding Ions where avalanche electrons are
-
 				const std::vector<DriftLineRKF::step> &path_i = driftline_i->path();
 				UInt_t nI = path_i.size();
 
@@ -1061,7 +1060,7 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 				        T = (step.tf + step.ti)/2;
 				        dX = step.xf - step.xi;
 				        dY = step.yf - step.yi;
-				        L = TMath::Sqrt(dX*dX + dY*dY);
+					L = TMath::Sqrt(dX*dX + dY*dY);
 
 					xy_ion->Fill(X,Y);
 					xy_ionL->Fill(X,Y,L);
@@ -1074,17 +1073,11 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 						max_Y = Y;
 						}
 					}
-//				ionLifetime->Fill(max_X, TMath::Log10(max_T), max_Y);
-//				ionLifetime->Fill(max_X, max_T, max_Y);
-
 				ionMap["X"] = max_X;
 				ionMap["Y"] = max_Y;
 				ionMap["T"] = max_T;
 				outTree->Fill();
-
-//				cout << max_X << " : " << TMath::Log10(max_T) << " : " <<  max_Y << endl;
 				}
-
 //			v_i->Plot(true,false);
 //			c_i->Update();
 //			std::cout << "Next avalanche..." << std::endl;
@@ -1095,6 +1088,29 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 //================================================================================
 	else
 		{
+		TFile * ionDistFile = new TFile("/gpfs01/star/pwg/iraklic/GARFIELD/WorkingSimulation/OnlyIons/ionFlux_TPC.root");
+		TH2F * ionDistHist = (TH2F *) ionDistFile->Get("ion_xyL");
+
+		fOut->cd();
+
+		double GG_Open_Time = 250; // in microseconds;
+		double ionDriftVelocity = 0.00025; // cm/microsecond
+
+//		this is how far ions will travel once GG is open for GG_Open_Time period in centimeters
+		double ionDriftY = GG_Open_Time * ionDriftVelocity;
+
+		int xMinBin = ionDistHist->GetXaxis()->FindBin(119);
+		int xMaxBin = ionDistHist->GetXaxis()->FindBin(120);
+		int yMinBin = ionDistHist->GetYaxis()->FindBin(0.0);
+		int yMaxBin = ionDistHist->GetYaxis()->FindBin(ionDriftY);
+
+		TH2F * ionDistPortion = new TH2F("flux", "flux", xMaxBin - xMinBin, 119, 120, yMaxBin - yMinBin, 0, ionDriftY);
+		TH2F * ionDistPortionCheck = new TH2F("fluxCheck", "fluxCheck", xMaxBin - xMinBin, 119, 120, yMaxBin - yMaxBin, -ionDriftY, 0);
+
+		for (int i = xMinBin; i < xMaxBin; i++)
+			for (int j = yMinBin; j < yMaxBin; j++)
+				ionDistPortion->SetBinContent(i - xMinBin + 1, j - yMinBin + 1, ionDistHist->GetBinContent(i, j));
+
 		for (Int_t i = nEvents; i--;)
 			{
 			if (i != nEvents) gBenchmark->Show("tpcGL");
@@ -1103,11 +1119,21 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 			gas->ResetCollisionCounters();
 			sensor->NewSignal();
 
-			Double_t xStart = xmin + RndmUniform() * (xmax - xmin);
+//			Below 2 lines are for flat distribution at some distance
+//			Double_t xStart = xmin + RndmUniform() * (xmax - xmin);
+//			Double_t yStart = yGG - 0.075; // Seeding point of Ions
+
+//			Below line is for seeding ions as they would have propagated once GG is open
+			double xStart = 0;
+			double yStart = 0;
+			ionDistPortion->GetRandom2(xStart, yStart);
+			yStart -= ionDriftY; // mooving ions below GG
+			ionDistPortionCheck->Fill(xStart, yStart);
+
 			eX->Fill(xStart);
 
 			Double_t zStart = 0;
-			Double_t tStart = 0.;
+			Double_t tStart = 0;
 			Double_t eStart = 0.1; // eV
 
 			Double_t X = (x1 + x0)/2;
@@ -1179,7 +1205,7 @@ void DrawFlux()
 	Double_t ymin = ion_xyL->GetYaxis()->GetXmin();
 	Double_t ymax = ion_xyL->GetYaxis()->GetXmax();
 	Double_t scale = elFlux*(xmax - xmin)/nx*(ymax - ymin)/ny;
-	cout << "scale = " << scale << endl;
+	cout << "scale = " <<  elFlux << " * " << (xmax - xmin) << " / " << nx << " * " << (ymax - ymin) << " / " << ny << scale << endl;
 	ion_xyL->Scale(1./scale);
 	ion_xyL->SetTitle("Flux (ions/cm) normalized to electron flux 1 cm^{-1}");
 	ion_xyL->SetXTitle("X (cm)");
