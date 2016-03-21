@@ -1,0 +1,1177 @@
+//Modified from StMiniMcMaker.cxx
+///////////////////////////////////////////////////////////
+#include "StMuDSTMaker/COMMON/StMuDstMaker.h"
+#include "StMuDSTMaker/COMMON/StMuEvent.h"
+#include "StMuDSTMaker/COMMON/StMuDst.h"
+#include "StMuDSTMaker/COMMON/StMuTrack.h"
+#include "StMuDSTMaker/COMMON/StMuPrimaryVertex.h"
+#include "StMuDSTMaker/COMMON/StMuMcVertex.h"
+#include "StMuDSTMaker/COMMON/StMuMcTrack.h"
+
+#include "StRecTreeMaker.h"
+#include "StEventTypes.h"
+#include "StEvent.h"
+#include "StParticleTable.hh"
+#include "StParticleDefinition.hh"
+#include "TNtuple.h"
+#include "TFile.h"
+#include "TTree.h"
+#include "TBranch.h"
+#include "TMath.h"
+
+#include "StMcEventMaker/StMcEventMaker.h"
+#include "StMcEventTypes.hh"
+#include "StMcEvent.hh"
+#include "StMcEvent/StMcTrack.hh"
+#include "StMcEvent/StMcTpcHitCollection.hh"
+#include "StMcEvent/StMcTpcHit.hh"
+#include "StMcEvent/StMcEmcHitCollection.hh"
+#include "StMcEvent/StMcCalorimeterHit.hh"
+#include "StMcEvent/StMcTofHitCollection.hh"
+#include "StMcEvent/StMcTofHit.hh"
+#include "StEvent/StTpcHitCollection.h"
+#include "StEvent/StTpcHit.h"
+#include "StEvent/StTrackPidTraits.h"
+#include "StEvent/StDedxPidTraits.h"
+#include "StEventUtilities/StuRefMult.hh"
+#include "StBFChain.h"
+#include "StMessMgr.h"
+
+#include "StChain.h"
+#include "St_DataSet.h"
+#include "St_DataSetIter.h"
+#include "StEventTypes.h"
+#include "StTpcDedxPidAlgorithm.h"
+#include "StParticleDefinition.hh"
+#include "StPhysicalHelix.hh"
+/*
+#include "StStrangeMuDstMaker/StStrangeMuDstMaker.h"
+#include "StStrangeMuDstMaker/StStrangeEvMuDst.hh"
+#include "StStrangeMuDstMaker/StV0MuDst.hh"
+#include "StStrangeMuDstMaker/StV0Mc.hh"
+#include "StStrangeMuDstMaker/StXiMuDst.hh"
+#include "StStrangeMuDstMaker/StXiMc.hh"
+#include "StStrangeMuDstMaker/StKinkMuDst.hh"
+#include "StStrangeMuDstMaker/StKinkMc.hh"
+*/
+
+#include "RecTree.h"
+
+ClassImp(StRecTreeMaker)	// this a macro, no ";" here
+
+StRecTreeMaker::StRecTreeMaker(StMuDstMaker* maker, const Char_t *outname="") : 
+	mTupFile(0),
+	trackTree(0)
+	{
+	mMuDstMaker = maker;
+	outName = outname;
+
+	return;
+	}
+
+StRecTreeMaker::~StRecTreeMaker() { return; }
+
+void StRecTreeMaker::InitHisto()
+	{
+	I_LengthvsEtaP = new TH2F ("LengthvsEtaP", "Length vs. eta passed", 100, -3, 3, 100, 0, 300);
+	I_LengthvsEtaF = new TH2F ("LengthvsEtaF", "Length vs. eta failed", 100, -3, 3, 100, 0, 300);
+
+	I_MCHitsvsEta = new TH2F ("MCHitsvsEta", "MC Hits vs. eta", 100, -3, 3, 100, 0, 300);
+
+	I_HitsvsEtaP = new TH2F ("HitsvsEtaP", "Hits vs. eta passed", 100, -3, 3, 100, 0, 300);
+	I_HitsvsEtaF = new TH2F ("HitsvsEtaF", "Hits vs. eta failed", 100, -3, 3, 100, 0, 300);
+
+	I_HitsvsLength = new TH2F ("HitsvsLength", "Hits vs Length", 100, 0, 200, 100, 0, 100);
+
+	I_eff15 = new TH1F("eff15", "Track reconstruction efficiency (nHits > 15)" , 100, -3, 3);
+	I_eff30 = new TH1F("eff30", "Track reconstruction efficiency (trackLength > 30)" , 100, -3, 3);
+
+	I_MCTrackPtvsEta = new TH2F("MCPtvsEta", "MCPtvsEta", 100, -3, 3, 100, 0, 3);
+	I_MCTrackPtvsEta15 = new TH2F("MCPtvsEta15", "MCPtvsEta15", 100, -3, 3, 100, 0, 3);
+
+	I_gTrackPtvsEta = new TH2F("PtvsEta", "PtvsEta", 100, -3, 3, 100, 0, 3);
+	I_gTrackPtvsEta15 = new TH2F("PtvsEta15", "PtvsEta", 100, -3, 3, 100, 0, 3);
+	I_gTrackPtvsEta30 = new TH2F("PtvsEta30", "PtvsEta", 100, -3, 3, 100, 0, 3);
+
+	h_dedx_p = new TH2D("dedx_p","dedx momentum",2000,-10,10,500,0,5e-5);
+	h_dedx_p->GetXaxis()->SetTitle("p#times q");
+	h_dedx_p->SetMarkerSize(0.4);
+
+	h_proton_nsigma_p = new TH2D("proton_nsigma_p","proton nsigma momentum",2000,-10,10,100,-5,5);
+	h_pion_nsigma_p = new TH2D("pion_nsigma_p","pion nsigma momentum",2000,-10,10,100,-5,5);
+	h_select_proton_nsigma_p = new TH2D("selected_proton_nsigma_p","proton nsigma momentum",2000,-10,10,100,-5,5);
+	h_select_pion_nsigma_p = new TH2D("selected_pion_nsigma_p","pion nsigma momentum",2000,-10,10,100,-5,5);
+
+//	IRAKLI
+	h_hitsTimesLength = new TH1F("hitsTimesLength", "hitsTimesLength", 100, 0, 50);
+	h_hitsTimesLengthNoClone = new TH1F("hitsTimesLengthNoClone", "hitsTimesLengthNoClone", 100, 0, 50);
+	h_hitsTimesLengthClone = new TH1F("hitsTimesLengthClone", "hitsTimesLengthClone", 100, 0, 50);
+	h_mcHits_mcTrackPt = new TH2D ("mcHits_mcTrackPt", "mcHits_mcTrackPt", 30, 0, 3, 30, 0, 300);
+	h_mcHits = new TH1D("mcHits", "mcHits", 300, 0, 300);
+
+	h_gTrackHits = new TH1D("gTrackHits", "gTrackHits", 100, 0, 100);
+	h_gTrackHitsClone = new TH1D("gTrackHitsClone", "gTrackHitsClone", 100, 0, 100);
+	h_gTrackHitsNoGhost = new TH1D("gTrackHitsNoGhost", "gTrackHitsNoGhost", 100, 0, 100);
+	h_gTrackHitsCloneNoGhost = new TH1D("gTrackHitsCloneNoGhost", "gTrackHitsCloneNoGhost", 100, 0, 100);
+	h_gTrackHitsNoClone = new TH1D("gTrackHitsNoClone", "gTrackHitsNoClone", 100, 0, 100);
+	h_gTrackHitsNoCloneNoGhost = new TH1D("gTrackHitsNoCloneNoGhost", "gTrackHitsNoCloneNoGhost", 100, 0, 100);
+
+	h_mcEta = new TH1F("mcEta", "mcEta", 300, -3, 3);
+	h_gTrackEta = new TH1D("gTrackEta", "gTrackEta", 300, -3, 3);
+	h_gTrackEtaNoGhost = new TH1D("gTrackEtaNoGhost", "gTrackEtaNoGhost", 300, -3, 3);
+	h_gTrackEtaNoClone = new TH1D("gTrackEtaNoClone", "gTrackEtaNoClone", 300, -3, 3);
+
+	h_Eff = new TH1D("Efficiency", "Efficiency", 300, -3, 3);
+	h_EffNoGhost = new TH1D("EfficiencyNoGhost", "EfficiencyNoGhost", 300, -3, 3);
+	h_EffNoClone = new TH1D("EfficiencyNoClone", "EfficiencyNoClone", 300, -3, 3);
+	}
+
+Int_t StRecTreeMaker::Init()
+	{
+	for (int i = 0; i < 302; i++)
+		{
+		mcEtaMap[i] = 0;
+		gTrackEtaMap[i] = 0;
+		gTrackEtaMapClone[i] = 0;
+		gTrackEtaMapCloneNoGhost[i] = 0;
+		gTrackEtaMapNoGhost[i] = 0;
+		gTrackEtaMapNoClone[i] = 0;
+		gTrackEtaMapNoCloneNoGhost[i] = 0;
+		}
+
+	outName.ReplaceAll("root","rectree.root");
+	mTupFile = new TFile(outName, "RECREATE");
+	mTupFile->SetCompressionLevel(9);
+	trackTree= new TTree("mTrackEvent","trackTree");
+	InitHisto();
+	trackTree->SetAutoSave(1000000);
+
+	cout << "Initialize the recotree ... " << endl;
+
+	trackTree->Branch("mIEvt",&mTrackEvent.mIEvt,"mIEvt/I");
+	trackTree->Branch("OriginMult",&mTrackEvent.OriginMult,"OriginMult/I");
+	trackTree->Branch("McMult",&mTrackEvent.McMult,"McMult/I");
+	trackTree->Branch("mRcVertexX",&mTrackEvent.mRcVertexX,"mRcVertexX/F");
+	trackTree->Branch("mRcVertexY",&mTrackEvent.mRcVertexY,"mRcVertexY/F");
+	trackTree->Branch("mRcVertexZ",&mTrackEvent.mRcVertexZ,"mRcVertexZ/F");
+	trackTree->Branch("mMcVertexX",&mTrackEvent.mMcVertexX,"mMcVertexX/F");
+	trackTree->Branch("mMcVertexY",&mTrackEvent.mMcVertexY,"mMcVertexY/F");
+	trackTree->Branch("mMcVertexZ",&mTrackEvent.mMcVertexZ,"mMcVertexZ/F");
+	trackTree->Branch("MagField",&mTrackEvent.MagField,"MagField/F");
+
+	trackTree->Branch("mNMcTrk",&mTrackEvent.mNMcTrk,"mNMcTrk/I");
+	trackTree->Branch("mMcId",mTrackEvent.mMcId,"mMcId[mNMcTrk]/I");
+	trackTree->Branch("mGeantId",mTrackEvent.mGeantId,"mGeantId[mNMcTrk]/I");
+	trackTree->Branch("mMcPt",mTrackEvent.mMcPt,"mMcPt[mNMcTrk]/F");
+	trackTree->Branch("mMcPx",mTrackEvent.mMcPx,"mMcPx[mNMcTrk]/F");
+	trackTree->Branch("mMcPy",mTrackEvent.mMcPy,"mMcPy[mNMcTrk]/F");
+	trackTree->Branch("mMcPz",mTrackEvent.mMcPz,"mMcPz[mNMcTrk]/F");
+	trackTree->Branch("mMcEta",mTrackEvent.mMcEta,"mMcEta[mNMcTrk]/F");
+	trackTree->Branch("mMcPhi",mTrackEvent.mMcPhi,"mMcPhi[mNMcTrk]/F");
+
+	trackTree->Branch("mNRcTrk",&mTrackEvent.mNRcTrk,"mNRcTrk/I");
+	trackTree->Branch("mRcId",mTrackEvent.mRcId,"mRcId[mNRcTrk]/I");
+	trackTree->Branch("mRcAssoId",mTrackEvent.mRcAssoId,"mRcAssoId[mNRcTrk]/I");
+	trackTree->Branch("mRcAssoGId",mTrackEvent.mRcAssoGId,"mRcAssoGId[mNRcTrk]/I");
+	trackTree->Branch("RcMult",&mTrackEvent.RcMult,"RcMult/I");
+//	*************************************************************************************************
+	trackTree->Branch("nv0",&mTrackEvent.nv0,"nv0/I");
+//	trackTree->Branch("ndau1",&mTrackEvent.ndau1,"ndau1/I");
+	trackTree->Branch("ndau2",&mTrackEvent.ndau2,"ndau2/I");
+	trackTree->Branch("ndau3",&mTrackEvent.ndau3,"ndau3/I");
+	
+	trackTree->Branch("parentgepid",mTrackEvent.parentgepid,"parentgepid[nv0]/I");//name starts with parent are MC info.
+	trackTree->Branch("parentidvx",mTrackEvent.parentidvx,"parentidvx[nv0]/I");
+	trackTree->Branch("parentidvxend",mTrackEvent.parentidvxend,"parentidvxend[nv0]/I");
+	trackTree->Branch("parentcharge",mTrackEvent.parentcharge,"parentcharge[nv0]/I");
+	trackTree->Branch("parenteta",mTrackEvent.parenteta,"parenteta[nv0]/F");
+	trackTree->Branch("parentdecayx",mTrackEvent.parentdecayx,"parentdecayx[nv0]/F");// MC Lambda Decay Position x
+	trackTree->Branch("parentdecayy",mTrackEvent.parentdecayy,"parentdecayy[nv0]/F");// MC Lambda Decay Position y
+	trackTree->Branch("parentdecayz",mTrackEvent.parentdecayz,"parentdecayz[nv0]/F");// MC Lambda Decay Position z
+	trackTree->Branch("parentpt",mTrackEvent.parentpt,"parentpt[nv0]/F");// MC Lambda pt
+	trackTree->Branch("parentpx",mTrackEvent.parentpx,"parentpx[nv0]/F");// MC Lambda px
+	trackTree->Branch("parentpy",mTrackEvent.parentpy,"parentpy[nv0]/F");// MC Lambda py
+	trackTree->Branch("parentpz",mTrackEvent.parentpz,"parentpz[nv0]/F");// MC Lambda pz
+
+	trackTree->Branch("v0mass",mTrackEvent.v0mass,"v0mass[nv0]/F");
+	trackTree->Branch("v0pt",mTrackEvent.v0pt,"v0pt[nv0]/F");
+	trackTree->Branch("v0rapidity",mTrackEvent.v0rapidity,"v0rapidity[nv0]/F");
+	trackTree->Branch("v0eta",mTrackEvent.v0eta,"v0eta[nv0]/F");
+	trackTree->Branch("v0x",mTrackEvent.v0x,"v0x[nv0]/F");
+	trackTree->Branch("v0y",mTrackEvent.v0y,"v0y[nv0]/F");
+	trackTree->Branch("v0z",mTrackEvent.v0z,"v0z[nv0]/F");
+	trackTree->Branch("v0px",mTrackEvent.v0px,"v0px[nv0]/F");
+	trackTree->Branch("v0py",mTrackEvent.v0py,"v0py[nv0]/F");
+	trackTree->Branch("v0pz",mTrackEvent.v0pz,"v0pz[nv0]/F");
+	trackTree->Branch("v0declen",mTrackEvent.v0declen,"v0declen[nv0]/F");
+	trackTree->Branch("v0dca",mTrackEvent.v0dca,"v0dca[nv0]/F");
+//	trackTree->Branch("dca1to2",mTrackEvent.dca1to2,"dca1to2[nv0]/F");
+//	trackTree->Branch("dca1to3",mTrackEvent.dca1to3,"dca1to3[nv0]/F");
+	trackTree->Branch("dca2to3",mTrackEvent.dca2to3,"dca2to3[nv0]/F");
+//	trackTree->Branch("dca1toxv0123",mTrackEvent.dca1toxv0123,"dca1toxv0123[nv0]/F");
+//	trackTree->Branch("dca2toxv0123",mTrackEvent.dca2toxv0123,"dca2toxv0123[nv0]/F");
+//	trackTree->Branch("dca3toxv0123",mTrackEvent.dca3toxv0123,"dca3toxv0123[nv0]/F");
+//	*****
+//	trackTree->Branch("dca1toxv012",mTrackEvent.dca1toxv012,"dca1toxv012[nv0]/F");
+//	trackTree->Branch("dca2toxv012",mTrackEvent.dca2toxv012,"dca2toxv012[nv0]/F");
+	trackTree->Branch("dca2toxv023",mTrackEvent.dca2toxv023,"dca2toxv023[nv0]/F");
+	trackTree->Branch("dca3toxv023",mTrackEvent.dca3toxv023,"dca3toxv023[nv0]/F");
+//	trackTree->Branch("dca1toxv013",mTrackEvent.dca1toxv013,"dca1toxv013[nv0]/F");
+//	trackTree->Branch("dca3toxv013",mTrackEvent.dca3toxv013,"dca3toxv013[nv0]/F");
+//	trackTree->Branch("xv012toPV",mTrackEvent.xv012toPV,"xv012toPV[nv0]/F");
+	trackTree->Branch("xv023toPV",mTrackEvent.xv023toPV,"xv023toPV[nv0]/F");
+//	trackTree->Branch("xv013toPV",mTrackEvent.xv013toPV,"xv013toPV[nv0]/F");
+//	trackTree->Branch("dcaxv012toPV",mTrackEvent.dcaxv012toPV,"dcaxv012toPV[nv0]/F");
+	trackTree->Branch("dcaxv023toPV",mTrackEvent.dcaxv023toPV,"dcaxv023toPV[nv0]/F");
+//	trackTree->Branch("dcaxv013toPV",mTrackEvent.dcaxv013toPV,"dcaxv013toPV[nv0]/F");
+/*
+	trackTree->Branch("dau1id",mTrackEvent.dau1id,"dau1id[nv0]/I");
+	trackTree->Branch("dau1dca",mTrackEvent.dau1dca,"dau1dca[nv0]/F");
+	trackTree->Branch("dau1nhits",mTrackEvent.dau1nhits,"dau1nhits[nv0]/I");
+	trackTree->Branch("dau1nhitsfit",mTrackEvent.dau1nhitsfit,"dau1nhitsfit[nv0]/I");
+	trackTree->Branch("dau1nhitsposs",mTrackEvent.dau1nhitsposs,"dau1nhitsposs[nv0]/I");
+	trackTree->Branch("dau1nhitsdedx",mTrackEvent.dau1nhitsdedx,"dau1nhitsdedx[nv0]/I");
+	trackTree->Branch("dau1eta",mTrackEvent.dau1eta,"dau1eta[nv0]/F");
+	trackTree->Branch("dau1dedx",mTrackEvent.dau1dedx,"dau1dedx[nv0]/F");
+	trackTree->Branch("dau1Z",mTrackEvent.dau1Z,"dau1Z[nv0]/F");
+	trackTree->Branch("dau1nsigma",mTrackEvent.dau1nsigma,"dau1nsigma[nv0]/F");
+	trackTree->Branch("dau1pt",mTrackEvent.dau1pt,"dau1pt[nv0]/F");
+	trackTree->Branch("dau1px",mTrackEvent.dau1px,"dau1px[nv0]/F");
+	trackTree->Branch("dau1py",mTrackEvent.dau1py,"dau1py[nv0]/F");
+	trackTree->Branch("dau1pz",mTrackEvent.dau1pz,"dau1pz[nv0]/F");
+	trackTree->Branch("dau1tpc",mTrackEvent.dau1tpc,"dau1tpc[nv0]/I");
+	trackTree->Branch("dau1mass",mTrackEvent.dau1mass,"dau1mass[nv0]/F"); // xuyifei_Feb13
+	trackTree->Branch("dau1beta",mTrackEvent.dau1beta,"dau1beta[nv0]/F"); // xuyifei_Feb13
+*/
+	trackTree->Branch("dau2id",mTrackEvent.dau2id,"dau2id[nv0]/I");
+	trackTree->Branch("dau2charge",mTrackEvent.dau2charge,"dau2charge[nv0]/I");
+	trackTree->Branch("dau2dca",mTrackEvent.dau2dca,"dau2dca[nv0]/F");
+	trackTree->Branch("dau2nhits",mTrackEvent.dau2nhits,"dau2nhits[nv0]/I");
+	trackTree->Branch("dau2nhitsfit",mTrackEvent.dau2nhitsfit,"dau2nhitsfit[nv0]/I");
+	trackTree->Branch("dau2nhitsposs",mTrackEvent.dau2nhitsposs,"dau2nhitsposs[nv0]/I");
+	trackTree->Branch("dau2nhitsdedx",mTrackEvent.dau2nhitsdedx,"dau2nhitsdedx[nv0]/I");
+	trackTree->Branch("dau2pathlength",mTrackEvent.dau2pathlength,"dau2pathlength[nv0]/F");
+	trackTree->Branch("dau2eta",mTrackEvent.dau2eta,"dau2eta[nv0]/F");
+	trackTree->Branch("dau2dedx",mTrackEvent.dau2dedx,"dau2dedx[nv0]/F");
+	trackTree->Branch("dau2nsigma",mTrackEvent.dau2nsigma,"dau2nsigma[nv0]/F");
+	trackTree->Branch("dau2pt",mTrackEvent.dau2pt,"dau2pt[nv0]/F");
+	trackTree->Branch("dau2px",mTrackEvent.dau2px,"dau2px[nv0]/F");
+	trackTree->Branch("dau2py",mTrackEvent.dau2py,"dau2py[nv0]/F");
+	trackTree->Branch("dau2pz",mTrackEvent.dau2pz,"dau2pz[nv0]/F");
+//	trackTree->Branch("dau2tpc",mTrackEvent.dau2tpc,"dau2tpc[nv0]/I");
+//	trackTree->Branch("dau2mass",mTrackEvent.dau2mass,"dau2mass[nv0]/F"); // xuyifei_Feb13
+//	trackTree->Branch("dau2beta",mTrackEvent.dau2beta,"dau2beta[nv0]/F"); // xuyifei_Feb13
+	trackTree->Branch("dau2GePid",mTrackEvent.dau2GePid,"dau2GePid[nv0]/I"); // xuyifei_Feb13
+	trackTree->Branch("dau2ParentVxid",mTrackEvent.dau2ParentVxid,"dau2ParentVxid[nv0]/I"); // xuyifei_Feb13
+
+	trackTree->Branch("dau2assoidvx",mTrackEvent.dau2assoidvx,"dau2assoidvx[nv0]/I");
+	trackTree->Branch("dau2assoidvxend",mTrackEvent.dau2assoidvxend,"dau2assoidvxend[nv0]/I");
+	trackTree->Branch("dau2assopt",mTrackEvent.dau2assopt,"dau2assopt[nv0]/F");
+	trackTree->Branch("dau2assopx",mTrackEvent.dau2assopx,"dau2assopx[nv0]/F");
+	trackTree->Branch("dau2assopy",mTrackEvent.dau2assopy,"dau2assopy[nv0]/F");
+	trackTree->Branch("dau2assopz",mTrackEvent.dau2assopz,"dau2assopz[nv0]/F");
+	trackTree->Branch("dau2assocharge",mTrackEvent.dau2assocharge,"dau2assocharge[nv0]/I");
+
+	trackTree->Branch("dau3id",mTrackEvent.dau3id,"dau3id[nv0]/I");
+	trackTree->Branch("dau3charge",mTrackEvent.dau3charge,"dau3charge[nv0]/I");
+	trackTree->Branch("dau3dca",mTrackEvent.dau3dca,"dau3dca[nv0]/F");
+	trackTree->Branch("dau3nhits",mTrackEvent.dau3nhits,"dau3nhits[nv0]/I");
+	trackTree->Branch("dau3nhitsfit",mTrackEvent.dau3nhitsfit,"dau3nhitsfit[nv0]/I");
+	trackTree->Branch("dau3nhitsposs",mTrackEvent.dau3nhitsposs,"dau3nhitsposs[nv0]/I");
+	trackTree->Branch("dau3nhitsdedx",mTrackEvent.dau3nhitsdedx,"dau3nhitsdedx[nv0]/I");
+	trackTree->Branch("dau3pathlength",mTrackEvent.dau3pathlength,"dau3pathlength[nv0]/F");
+	trackTree->Branch("dau3eta",mTrackEvent.dau3eta,"dau3eta[nv0]/F");
+	trackTree->Branch("dau3dedx",mTrackEvent.dau3dedx,"dau3dedx[nv0]/F");
+	trackTree->Branch("dau3nsigma",mTrackEvent.dau3nsigma,"dau3nsigma[nv0]/F");
+	trackTree->Branch("dau3pt",mTrackEvent.dau3pt,"dau3pt[nv0]/F");
+	trackTree->Branch("dau3px",mTrackEvent.dau3px,"dau3px[nv0]/F");
+	trackTree->Branch("dau3py",mTrackEvent.dau3py,"dau3py[nv0]/F");
+	trackTree->Branch("dau3pz",mTrackEvent.dau3pz,"dau3pz[nv0]/F");
+//	trackTree->Branch("dau3tpc",mTrackEvent.dau3tpc,"dau3tpc[nv0]/I");
+//	trackTree->Branch("dau3mass",mTrackEvent.dau3mass,"dau3mass[nv0]/F"); // xuyifei_Feb13
+//	trackTree->Branch("dau3beta",mTrackEvent.dau3beta,"dau3beta[nv0]/F"); // xuyifei_Feb13
+	trackTree->Branch("dau3GePid",mTrackEvent.dau3GePid,"dau3GePid[nv0]/I"); // xuyifei_Feb13
+	trackTree->Branch("dau3ParentVxid",mTrackEvent.dau3ParentVxid,"dau3ParentVxid[nv0]/I"); // xuyifei_Feb13
+
+	trackTree->Branch("dau3assoidvx",mTrackEvent.dau3assoidvx,"dau3assoidvx[nv0]/I");
+	trackTree->Branch("dau3assoidvxend",mTrackEvent.dau3assoidvxend,"dau3assoidvxend[nv0]/I");
+	trackTree->Branch("dau3assopt",mTrackEvent.dau3assopt,"dau3assopt[nv0]/F");
+	trackTree->Branch("dau3assopx",mTrackEvent.dau3assopx,"dau3assopx[nv0]/F");
+	trackTree->Branch("dau3assopy",mTrackEvent.dau3assopy,"dau3assopy[nv0]/F");
+	trackTree->Branch("dau3assopz",mTrackEvent.dau3assopz,"dau3assopz[nv0]/F");
+	trackTree->Branch("dau3assocharge",mTrackEvent.dau3assocharge,"dau3assocharge[nv0]/I");
+//	*************************************************************************************************
+	mDauVec1.clear();// StMuTrack*
+	mDauVec2.clear();
+	mDauVec3.clear();
+	
+	mDau1GePid.clear();
+	mDau2GePid.clear();
+	mDau3GePid.clear();
+
+//	mDauDcaVec1.clear();// Double
+//	mDauDcaVec2.clear();
+//	mDauDcaVec3.clear();
+//	mDauMass1.clear();
+//	mDauMass2.clear();
+//	mDauMass3.clear();
+//	mDauBeta1.clear();
+//	mDauBeta2.clear();
+//	mDauBeta3.clear();
+//	*************************************************************************************************
+
+	return StMaker::Init();
+	} // \StMaker::Init
+
+void StRecTreeMaker::Clear(Option_t *opt)
+	{
+	StMaker::Clear();
+	}
+
+Int_t StRecTreeMaker::Finish()
+	{
+//	IRAKLI
+	int total_gTracks = 0;
+	int total_gTracksNoGhost = 0;
+	int total_mcTracks = 0;
+	for (map<int, int>::iterator mit = mcEtaMap.begin(); mit != mcEtaMap.end(); mit++)
+		{
+		h_mcEta->SetBinContent(mit->first, mit->second);
+		total_mcTracks+=mit->second;
+		}
+	for (map<int, int>::iterator mit = gTrackEtaMap.begin(); mit != gTrackEtaMap.end(); mit++)
+		{
+		h_gTrackEta->SetBinContent(mit->first, mit->second);
+		total_gTracks+=mit->second;
+		}
+	for (map<int, int>::iterator mit = gTrackEtaMapNoGhost.begin(); mit != gTrackEtaMapNoGhost.end(); mit++)
+		{
+		h_gTrackEtaNoGhost->SetBinContent(mit->first, mit->second);
+		total_gTracksNoGhost+=mit->second;
+		}
+	for (map<int, int>::iterator mit = gTrackEtaMapNoClone.begin(); mit != gTrackEtaMapNoClone.end(); mit++)
+		h_gTrackEtaNoClone->SetBinContent(mit->first, mit->second);
+
+	for (int i = 0; i < 302; i ++)
+		{
+		double eff = 0;
+		double effNoGhost = 0;
+		double effNoClone = 0;
+		if (mcEtaMap[i] != 0)
+			{
+			eff		= (double) gTrackEtaMap[i] / (double) mcEtaMap[i];
+			effNoGhost	= (double) gTrackEtaMapNoGhost[i] / (double) mcEtaMap[i];
+			effNoClone	= (double) gTrackEtaMapNoClone[i] / (double) mcEtaMap[i];
+			}
+		h_Eff->SetBinContent(i, eff);
+		h_EffNoGhost->SetBinContent(i, effNoGhost);
+		h_EffNoClone->SetBinContent(i, effNoClone);
+		}
+
+	cout << "Number of MC Tracks = " << total_mcTracks << "\nNumber of gTracks = " << total_gTracks << "\nNumber of gTracksNoGhost = " << total_gTracksNoGhost << endl;
+
+	trackTree->Write();
+
+//	h_dedx_p->Write();
+//	h_proton_nsigma_p->Write();
+//	h_pion_nsigma_p->Write();
+//	h_select_proton_nsigma_p->Write();
+//	h_select_pion_nsigma_p->Write();
+
+	mTupFile->Write();
+	mTupFile->Close();
+
+	return kStOK;
+	}
+
+Int_t StRecTreeMaker::Make()
+	{
+//	StMuDst*	muDst	= mMuDstMaker->muDst();
+	StMuEvent*	muEvent = mMuDstMaker->muDst()->event();
+
+	if(!muEvent )
+		{
+		cout << "xuyifei: ------------muEvent" << endl;
+		return kStOK;
+		}
+	int mRcMult = muEvent->refMult();
+
+//	*******************************************************************
+	double mMassProton = 0.93827;
+	double mMassPion = 0.13957;
+	double mMassLambda = 1.11568;
+//	*******************************************************************
+//	event level
+	tb_mIEvt = muEvent->eventId();
+	tb_MagField = mMuDstMaker->muDst()->event()->magneticField()/10.;
+
+	double magn = muEvent->magneticField();
+
+	StThreeVectorF pv;
+//	StThreeVectorF pvx = muEvent->primaryVertexPosition();
+
+//*******************************************************************
+	TClonesArray *PrimaryVertices = mMuDstMaker->muDst()->primaryVertices();
+	Int_t NoPrimaryVertices = PrimaryVertices->GetEntriesFast();
+
+	TClonesArray *GlobalTracks = mMuDstMaker->muDst()->array(muGlobal);
+	Int_t NoGlobalTracks = GlobalTracks->GetEntriesFast(); 
+
+	TClonesArray * PrimaryTracks =  mMuDstMaker->muDst()->array(muPrimary);  
+	int NoPrimaryTracks = PrimaryTracks->GetEntriesFast();
+
+	TClonesArray *MuMcVertices = mMuDstMaker->muDst()->mcArray(0);
+	Int_t NoMuMcVertices = MuMcVertices->GetEntriesFast();
+
+	TClonesArray *MuMcTracks = mMuDstMaker->muDst()->mcArray(1);
+	Int_t NoMuMcTracks = MuMcTracks->GetEntriesFast();
+
+//	=================================================================================================
+//	=================================================================================================
+	for(Int_t m = 0; m < NoMuMcTracks; m++)
+		{
+		StMuMcTrack *mcTrack = (StMuMcTrack *) MuMcTracks->UncheckedAt(m);
+		if(! mcTrack) continue;
+//		mTrackEvent.mMcId[imc] = mcTrack->Id();
+//		mTrackEvent.mGeantId[imc] = mcTrack->GePid();
+//		mTrackEvent.mMcPt[imc] = mcTrack->Pxyz().perp();
+//		mTrackEvent.mMcPx[imc] = mcTrack->Pxyz().x();
+//		mTrackEvent.mMcPy[imc] = mcTrack->Pxyz().y();
+//		mTrackEvent.mMcPz[imc] = mcTrack->Pxyz().z();
+//		mTrackEvent.mMcEta[imc] = mcTrack->Pxyz().pseudoRapidity();
+//		mTrackEvent.mMcPhi[imc] = mcTrack->Pxyz().phi();
+//		Int_t IdVx = mcTrack->IdVx();
+
+		if (mcTrack->Charge() == 0) continue;
+		if (mcTrack->IdVx() != 1) continue;
+
+		I_MCTrackPtvsEta->Fill(mcTrack->Pxyz().pseudoRapidity(), mcTrack->Pxyz().perp());
+		I_MCHitsvsEta->Fill(mcTrack->Pxyz().pseudoRapidity(), mcTrack->No_tpc_hit());
+		}
+//	-------------------------------------------------------------------------------------------------
+	multimap<Int_t, Int_t> Mc2RcTracks;
+	int cloneCounter = -999;
+	vector <int> cloneCheck;
+
+	for (Int_t l = 0; l < NoPrimaryVertices; l++)
+		{
+		StMuPrimaryVertex *Vtx = (StMuPrimaryVertex *) PrimaryVertices->UncheckedAt(l);
+		if (Vtx->idTruth() != 1) continue;
+		for (Int_t k = 0; k < NoPrimaryTracks; k++)
+			{
+			StMuTrack *pTrack = (StMuTrack *) PrimaryTracks->UncheckedAt(k);
+			if (pTrack->idTruth() < 0 || pTrack->idTruth() > NoMuMcTracks)
+				{
+				cout << "Illegal idTruth " << pTrack->idTruth() << " The track is ignored" << endl;
+				continue;
+				}
+			StMuMcTrack *mcTrack = (StMuMcTrack *) MuMcTracks->UncheckedAt(pTrack->idTruth()-1);
+			if (mcTrack->Id() != pTrack->idTruth())
+				{
+				cout << "Mismatched idTruth " << pTrack->idTruth() << " and mcTrack Id " <<  mcTrack->Id() << " The track is ignored" << endl;
+				continue;
+				}
+
+
+			if (! pTrack) continue;
+			if (pTrack->vertexIndex() != l) continue;
+//			if (pTrack->idParentVx() == 1) continue;
+
+			const StMuProbPidTraits & PiD = pTrack->probPidTraits();
+			double TrackLength = PiD.dEdxTrackLength();
+
+			if (find(cloneCheck.begin(), cloneCheck.end(), mcTrack->Id()) == cloneCheck.end())
+				{
+				if (	pTrack				&&
+					pTrack->idTruth()		&&
+					pTrack->charge()		&&
+					pTrack->flag() >= 100	 	&&
+					pTrack->flag() % 100 != 11	&&	// bad fit or short track pointing to EEMC
+					pTrack->flag() <= 1000		&&	// pile up track in TPC
+					pTrack->nHitsFit() >= 5
+					)
+					{
+					I_gTrackPtvsEta->Fill(pTrack->eta(), pTrack->pt());
+					if (pTrack->pt() >= 0.065) I_HitsvsLength->Fill(TrackLength, pTrack->nHitsFit());
+					if (pTrack->nHitsFit() > 15)
+						{
+						I_gTrackPtvsEta15->Fill(pTrack->eta(), pTrack->pt());
+						I_HitsvsEtaP->Fill(pTrack->eta(), pTrack->nHitsFit());
+						}
+					else
+						{
+						I_HitsvsEtaF->Fill(pTrack->eta(), pTrack->nHitsFit());
+						}
+					if (TrackLength > 30)
+						{
+						I_gTrackPtvsEta30->Fill(pTrack->eta(), pTrack->pt());
+						I_LengthvsEtaP->Fill(pTrack->eta(), TrackLength);
+						}
+					else
+						{
+						I_LengthvsEtaF->Fill(pTrack->eta(), TrackLength);
+						}
+					}
+				cloneCheck.push_back(mcTrack->Id());
+				}
+			}
+		}
+
+//	=================================================================================================
+
+
+	if (! NoMuMcVertices || ! NoMuMcTracks)
+		{
+		cout << "Event has no MC information ==> skip it" << endl;
+		return kStOK;
+		}
+
+	Int_t nVtx = 0;
+	if(NoPrimaryVertices != (int)mMuDstMaker->muDst()->numberOfPrimaryVertices())
+		{
+		cout << "No. of Primary Vertices inconsistent! " << endl;
+		return kStOk;
+		}
+//	cout << "Found " << NoPrimaryVertices << " Primary Vertices ! " << endl;
+//*******************************************************************
+	for(int i = 0; i < (int)(mMuDstMaker->muDst()->numberOfPrimaryVertices()); i++)
+		{
+		StMuPrimaryVertex *pVtx = mMuDstMaker->muDst()->primaryVertex(i);
+		if(!pVtx)
+			{
+//			cout << "no vertex pointer! " << endl;
+			continue;
+			}
+		if(!pVtx->idTruth() || pVtx->idTruth()<0 || pVtx->idTruth()>NoMuMcVertices)
+			{
+//			cout << "Illegal idTruth " << pVtx->idTruth() << " The vertex is ignored" << endl;
+			continue;
+			}
+		StMuMcVertex *mcVertex = (StMuMcVertex *) MuMcVertices->UncheckedAt(pVtx->idTruth()-1);
+		if(mcVertex->Id() != pVtx->idTruth())
+			{
+//			cout << "Mismatched idTruth " << pVtx->idTruth() << " and mcVertex Id " <<mcVertex->Id() << " The vertex is ignored" <<endl;
+			continue;
+			}
+		StThreeVectorF mVertexPosition = pVtx->position();
+		tb_mRcVertexX = mVertexPosition.x(); 
+		tb_mRcVertexY = mVertexPosition.y(); 
+		tb_mRcVertexZ = mVertexPosition.z();
+		tb_OriginMult = mMuDstMaker->muDst()->event()->refMult();
+		tb_mMcVertexX = mcVertex->XyzV().x(); 
+		tb_mMcVertexY = mcVertex->XyzV().y(); 
+		tb_mMcVertexZ = mcVertex->XyzV().z();
+		tb_McMult = mcVertex->NoDaughters();
+		pv.setX(mVertexPosition.x());
+		pv.setY(mVertexPosition.y());
+		pv.setZ(mVertexPosition.z());
+
+		nVtx++; break;
+		}
+
+	if (nVtx <= 0)
+		{
+//		cout << "Event has no valid Vertex info. ==> skip it" << endl;
+		tb_mRcVertexX = -999.; 
+		tb_mRcVertexY = -999.; 
+		tb_mRcVertexZ = -999.;
+		pv.setX(-999);
+		pv.setY(-999);
+		pv.setZ(-999);
+		tb_OriginMult = mMuDstMaker->muDst()->event()->refMult();
+		StMuMcVertex *mcVertex = (StMuMcVertex *) MuMcVertices->UncheckedAt(0);
+		if(!mcVertex)
+			{
+			tb_mMcVertexX = -999.; 
+			tb_mMcVertexY = -999.; 
+			tb_mMcVertexZ = -999.;
+			tb_McMult = 0;
+			}
+		else
+			{
+			tb_mMcVertexX = mcVertex->XyzV().x(); 
+			tb_mMcVertexY = mcVertex->XyzV().y(); 
+			tb_mMcVertexZ = mcVertex->XyzV().z();
+			tb_McMult = mcVertex->NoDaughters();
+			}
+//		cout << "nVtx <= 0" << endl;
+		return kStOK;
+		}
+//	if(pv.x() <0 || pv.y() <0)
+//		{
+//		cout<<"xuyifei : pv.x="<<pv.x()<<"\tpv.y="<<pv.y()<<"\tpv.z="<<pv.z()<<endl;
+//		return kStOK;
+//		}
+
+//	cout << "Event variables filled" << endl;
+//	track level
+
+	Int_t imc = 0;
+
+	for(Int_t m = 0; m < NoMuMcTracks; m++)
+		{
+		StMuMcTrack *mcTrack = (StMuMcTrack *) MuMcTracks->UncheckedAt(m);
+		if(! mcTrack) continue;
+		mTrackEvent.mMcId[imc] = mcTrack->Id();
+		mTrackEvent.mGeantId[imc] = mcTrack->GePid();
+		mTrackEvent.mMcPt[imc] = mcTrack->Pxyz().perp();
+		mTrackEvent.mMcPx[imc] = mcTrack->Pxyz().x();
+		mTrackEvent.mMcPy[imc] = mcTrack->Pxyz().y();
+		mTrackEvent.mMcPz[imc] = mcTrack->Pxyz().z();
+		mTrackEvent.mMcEta[imc] = mcTrack->Pxyz().pseudoRapidity();
+		mTrackEvent.mMcPhi[imc] = mcTrack->Pxyz().phi();
+		Int_t IdVx = mcTrack->IdVx();
+
+		imc++;
+		}
+
+	tb_mNMcTrk = imc;
+
+	int irc = 0;
+	if(NoGlobalTracks != (int) mMuDstMaker->muDst()->numberOfGlobalTracks())
+		cout << "Number of global tracks inconsistent! " << endl;
+//	=================== Global Tracks ==============================================================
+	for(int i = 0; i < (int)mMuDstMaker->muDst()->numberOfGlobalTracks(); i++)// loop for a track
+		{
+		StMuTrack *gTrack = mMuDstMaker->muDst()->globalTracks(i);
+
+//		if(!gTrack) continue; // IRAKLI
+//		if(gTrack->flag() <= 0 || gTrack->flag() >= 1000) continue; // IRAKLI
+		int nHitsFit = gTrack->nHitsFit(); // remove kTpcId;
+//		if(nHitsFit<5) continue;
+		float ratio = (1.0*nHitsFit)/(1.0*gTrack->nHitsPoss()); //remove kTpcId;
+//		if(ratio<0.1) continue;
+
+		if(gTrack->idTruth() <= 0 || gTrack->idTruth() > NoMuMcTracks)
+			{
+			cout << "Illegal idTruth " << gTrack->idTruth() << " The track is ignored" << endl;
+			continue;
+			}
+		StMuMcTrack *mcTrack = (StMuMcTrack *) MuMcTracks->UncheckedAt(gTrack->idTruth()-1);
+		if (mcTrack->Id() != gTrack->idTruth())
+			{
+			cout << "Mismatched idTruth " << gTrack->idTruth() << " and mcTrack Id " <<mcTrack->Id() << " The track is ignored" <<endl;
+			continue;
+			}
+//*************************************************************************************************
+		if(mcTrack->IdVx()==1)	{continue;}// primary 
+		if(mcTrack->IdVx()<1)
+			{
+//			cout<<"xuyifei : mcTrack->IdVx< 1" << endl;
+			continue;
+			}
+		int No_Parent_Track = 0;
+		for(Int_t nmc = 0; nmc < NoMuMcTracks; nmc++)
+			{
+			StMuMcTrack *nmcTrack = (StMuMcTrack *) MuMcTracks->UncheckedAt(nmc);
+			if(!nmcTrack) continue;
+			if(nmcTrack->IdVxEnd()==1)
+				{
+//				cout<<"xuyifei : nmcTrack->IdVxEnd==1" << endl;
+				continue;
+				} // primary 
+			if(nmcTrack->IdVxEnd() == mcTrack->IdVx())// Find parent track of gTrack
+				{
+				if(nmcTrack->GePid() == 18 || nmcTrack->GePid() == 26)// nmcTrack is Lambda or Anti-Lambda
+					{
+					No_Parent_Track++;
+//					cout<<"xuyifei : ** Parent Lambda found. IdVxEnd=" << nmcTrack->IdVxEnd() << "/" << mcTrack->IdVx() << endl;
+					}
+				}
+			else continue;
+			}
+		if(No_Parent_Track == 0)
+			{
+//			cout<<"xuyifei : No Parent Lambda found."<<endl;
+			continue;
+			}
+		if(No_Parent_Track > 1)
+			{
+//			cout << "xuyifei : >1 Parent Lambda found." << endl;
+			continue;
+			}
+		
+//*************************************************************************************************
+		int track_id = 0;
+		int track_charge = 0;
+		int track_nhits = 0;
+		int track_nhitsfit = 0;
+		int track_nhitsposs = 0;
+		int track_nhitsdedx = 0;
+		double track_eta = 0;
+		double track_dedx = 0;
+		double track_nsigma_proton = 0;
+		double track_nsigma_pion = 0;
+		double track_p = 0;
+		double track_pt = 0;
+		double track_px = 0;
+		double track_py = 0;
+		double track_pz = 0;
+//		int track_tpc = 0;
+//		double track_mass = 0;
+//		double track_beta = 0;
+
+		track_id = gTrack->id();
+		track_charge = gTrack->charge();
+		track_nhits = gTrack->nHits();
+		track_nhitsfit = gTrack->nHitsFit();
+		track_nhitsposs = gTrack->nHitsPoss();
+		track_nhitsdedx = gTrack->nHitsDedx();
+		track_eta = gTrack->eta();
+		track_dedx = gTrack->dEdx();
+		track_pt = gTrack->pt();
+		track_p  = gTrack->p().mag();
+		track_px = gTrack->p().x();
+		track_py = gTrack->p().y();
+		track_pz = gTrack->p().z();
+		track_nsigma_proton = gTrack->nSigmaProton();
+		track_nsigma_pion = gTrack->nSigmaPion();
+
+//		if(track_nhitsfit < 15) continue;
+//		if(track_nhitsdedx< 15) continue;
+//		if(fabs(track_charge) != 1) continue;
+//		if(fabs(track_eta) > 1.0) continue;
+//		if(double(track_nhitsfit)/double(track_nhitsposs)<0.52) continue;
+//		if(track_pt<0.05) continue;
+
+		h_dedx_p->Fill(track_p*track_charge,track_dedx);
+		h_proton_nsigma_p->Fill(track_p*track_charge,track_nsigma_proton);
+		h_pion_nsigma_p->Fill(track_p*track_charge,track_nsigma_pion);
+//*************************************************************************************************
+//		StMuTrack *pTrack = const_cast<StMuTrack *>(gTrack->primaryTrack());
+//		StPhysicalHelixD ghelix = gTrack->helix();
+//		StPhysicalHelixD helix = gTrack->outerHelix();
+
+		mTrackEvent.mRcId[irc] = gTrack->id();
+		mTrackEvent.mRcAssoId[irc] = mcTrack->Id();
+		mTrackEvent.mRcAssoGId[irc] = mcTrack->GePid();  //bug fixed, it was [imc]
+
+		irc++;
+//*************************************************************************************************
+//		StMuMcTrack *mcTrack = (StMuMcTrack *) MuMcTracks->UncheckedAt(gTrack->idTruth()-1);
+//		if(track_nsigma_proton >= -2 && track_nsigma_proton <= 2)
+		if(mcTrack->GePid() == 14 ||  mcTrack->GePid() == 15)
+			{
+			mDauVec2.push_back(gTrack);
+			mDau2GePid.push_back(mcTrack->GePid());
+			h_select_proton_nsigma_p->Fill(track_p*track_charge,track_nsigma_proton);
+			}
+//		if(track_nsigma_pion >= -2 && track_nsigma_pion <= 2)
+		if(mcTrack->GePid() == 8 || mcTrack->GePid() == 9)
+			{
+			mDauVec3.push_back(gTrack);
+			mDau3GePid.push_back(mcTrack->GePid());
+			h_select_pion_nsigma_p->Fill(track_p*track_charge,track_nsigma_pion);
+			}
+//*************************************************************************************************
+		} // \Global Tracks
+//*************************************************************************************************
+	if(mDauVec2.size() != mDau2GePid.size())
+		{
+//		cerr<<"xuyifei : mDauVec2.size != mDau2GePid.size" << endl;
+		return kStOK;
+		}
+	if(mDauVec3.size() != mDau3GePid.size())
+		{
+//		cerr<<"xuyifei : mDauVec3.size != mDau3GePid.size"<<endl;
+		return kStOK;
+		}
+//	cout<<"xuyifei : mDau2.size = "<<mDauVec2.size()<<endl;
+//	cout<<"xuyifei : mDau3.size = "<<mDauVec3.size()<<endl;
+	tb_mNRcTrk=irc;
+
+	mTrackEvent.mIEvt = tb_mIEvt;
+	mTrackEvent.OriginMult = tb_OriginMult;
+	mTrackEvent.McMult = tb_McMult;
+	mTrackEvent.mRcVertexX = tb_mRcVertexX;
+	mTrackEvent.mRcVertexY = tb_mRcVertexY;
+	mTrackEvent.mRcVertexZ = tb_mRcVertexZ;
+	mTrackEvent.mMcVertexX = tb_mMcVertexX;
+	mTrackEvent.mMcVertexY = tb_mMcVertexY;
+	mTrackEvent.mMcVertexZ = tb_mMcVertexZ;
+	mTrackEvent.MagField = tb_MagField;
+		
+	mTrackEvent.mNMcTrk = tb_mNMcTrk;
+	mTrackEvent.mNRcTrk = tb_mNRcTrk;
+
+	int nv0=0;
+	tb_nv0=0;
+//	tb_ndau1=0;
+	tb_ndau2=mDauVec2.size();
+	tb_ndau3=mDauVec3.size();
+
+	mTrackEvent.nv0 = tb_nv0;
+//	mTrackEvent.ndau1 = tb_ndau1;
+	mTrackEvent.ndau2 = tb_ndau2;
+	mTrackEvent.ndau3 = tb_ndau3;
+
+	for(unsigned int j = 0; j < mDauVec2.size(); j++)
+		{
+		StMuTrack * track2 = mDauVec2[j];
+		StMuMcTrack *mcTrack2 = (StMuMcTrack *) MuMcTracks->UncheckedAt(track2->idTruth()-1);
+		int tb_dau2GePid = mDau2GePid[j];
+//		if(tb_dau2GePid != mcTrack2->GePid()) cout << "xuyifei : tb_dau2GePid != mcTrack2->GePid" << endl;
+		StPhysicalHelixD helix2 = track2->helix();
+
+		for(unsigned int k = 0; k < mDauVec3.size(); k++)
+			{
+			StMuTrack * track3 = mDauVec3[k];
+			StMuMcTrack *mcTrack3 = (StMuMcTrack *) MuMcTracks->UncheckedAt(track3->idTruth()-1);
+			int tb_dau3GePid = mDau3GePid[k];
+//			if(tb_dau3GePid != mcTrack3->GePid()) cout<<"xuyifei : tb_dau3GePid != mcTrack3->GePid"<<endl;
+			StPhysicalHelixD helix3 = track3->helix();
+	//		if(track2->id() == track3->id()) {cout<<"xuyifei : check id"<<endl;continue;} //not really triggered
+	//		if(track2->charge() == track3->charge()) {cout<<"xuyifei : check charge"<<endl;continue;}
+	//		if(track2->idParentVx() != track3->idParentVx()) continue;
+			if(mcTrack2->GePid() == 14 && mcTrack3->GePid() == 8)
+				{
+//				cout<<"xuyifei : check GePid 1"<<endl;
+				continue;
+				}
+			if(mcTrack2->GePid() == 15 && mcTrack3->GePid() == 9)
+				{
+//				cout<<"xuyifei : check GePid 2"<<endl;
+				continue;
+				}
+			if(mcTrack2->IdVx() != mcTrack3->IdVx())
+				{
+//				cout<<"xuyifei : check IdVx"<<endl;
+				continue;
+				}
+//			cout<<"xuyifei : final candidate found"<<endl;
+
+			int	Num_Parent_Track = 0;
+			int Parent_track_id=-999;
+			for(Int_t kk = 0; kk < NoMuMcTracks; kk++)
+				{
+				StMuMcTrack *kkmcTrack = (StMuMcTrack *) MuMcTracks->UncheckedAt(kk);
+				if(!kkmcTrack) continue;
+
+				if(kkmcTrack->IdVxEnd()==1)	{continue;}// primary 
+				if(kkmcTrack->IdVxEnd() == mcTrack2->IdVx())// Find parent track of gTrack
+					{
+					if(kkmcTrack->GePid() == 18 || kkmcTrack->GePid() == 26)// kkmcTrack is Lambda or Anti-Lambda
+						{
+						Num_Parent_Track++;
+						Parent_track_id = kk;
+//						cout<<"xuyifei : IdVxEnd="<<kkmcTrack->IdVxEnd()<<"/"<<mcTrack2->IdVx()<<endl;
+						}
+					}
+				else continue;
+				}
+			if(Num_Parent_Track == 0)
+				{
+//				cout<<"xuyifei : No Parent Lambda found."<<endl;
+				continue;
+				}
+			if(Num_Parent_Track > 1)
+				{
+//				cout<<"xuyifei : >1 Parent Lambda found."<<endl;
+				continue;
+				}
+			if(Parent_track_id == -999)
+				{
+//				cout<<"xuyifei : parent track id -999."<<endl;
+				continue;
+				}
+
+			StMuMcTrack *mcTrackparent = (StMuMcTrack *) MuMcTracks->UncheckedAt(Parent_track_id);
+			if(!mcTrackparent)
+				{
+//				cout<<"xuyifei : No Lambda Track !"<<endl;
+				continue;
+				}
+			if(mcTrackparent->IdVxEnd() != mcTrack2->IdVx())
+				{
+//				cout<<"xuyifei : idvxend != 2idvx"<<endl;
+				continue;
+				}
+			if(mcTrackparent->IdVxEnd() != mcTrack3->IdVx())
+				{
+//				cout<<"xuyifei : idvxend != 3idvx"<<endl;
+				continue;
+				}
+
+			StMuMcVertex *mcParentDecayVertex = (StMuMcVertex *) MuMcVertices->UncheckedAt(mcTrackparent->IdVxEnd()-1);
+			if(!mcParentDecayVertex)
+				{
+//				cout<<"xuyifei : No Lambda Decay Position !"<<endl;
+				continue;
+				}
+			// right ? xuyifei
+
+			int tb_parent_gepid  = mcTrackparent->GePid();
+			int tb_parent_idvx   = mcTrackparent->IdVx();
+			int tb_parent_idvxend= mcTrackparent->IdVxEnd();
+			int tb_parent_charge = mcTrackparent->Charge();
+			double tb_parentdecay_x = (mcParentDecayVertex->XyzV()).x();
+			double tb_parentdecay_y = (mcParentDecayVertex->XyzV()).y();
+			double tb_parentdecay_z = (mcParentDecayVertex->XyzV()).z();
+			double tb_parent_eta = mcTrackparent->Eta();
+			double tb_parent_pt = mcTrackparent->pT();
+			double tb_parent_px = mcTrackparent->Pxyz().x();
+			double tb_parent_py = mcTrackparent->Pxyz().y();
+			double tb_parent_pz = mcTrackparent->Pxyz().z();
+
+			int tb_dau2assocharge = mcTrack2->Charge();
+			int tb_dau2assoidvx = mcTrack2->IdVx();
+			int tb_dau2assoidvxend = mcTrack2->IdVxEnd();
+			double tb_dau2assopt = mcTrack2->pT();
+			double tb_dau2assopx = mcTrack2->Pxyz().x();
+			double tb_dau2assopy = mcTrack2->Pxyz().y();
+			double tb_dau2assopz = mcTrack2->Pxyz().z();
+
+			int tb_dau3assocharge = mcTrack3->Charge();
+			int tb_dau3assoidvx = mcTrack3->IdVx();
+			int tb_dau3assoidvxend = mcTrack3->IdVxEnd();
+			double tb_dau3assopt = mcTrack3->pT();
+			double tb_dau3assopx = mcTrack3->Pxyz().x();
+			double tb_dau3assopy = mcTrack3->Pxyz().y();
+			double tb_dau3assopz = mcTrack3->Pxyz().z();
+
+			int tb_dau2charge = track2->charge();
+			int tb_dau3charge = track3->charge();
+			double tb_dau2pathlength = track2->lengthMeasured();// cm, first to last measured point
+			double tb_dau3pathlength = track3->lengthMeasured();// cm, first to last measured point
+
+			double dca2_pathlength = helix2.pathLength(pv);// pv or pvx
+			double dca2 = (helix2.at(dca2_pathlength) - pv).mag();
+			double dca3_pathlength = helix3.pathLength(pv);
+			double dca3 = (helix3.at(dca3_pathlength) - pv).mag();
+			
+			StThreeVectorF xv023;
+			StThreeVectorF pv023;
+
+			StThreeVectorF ox2,ox3;
+			StThreeVectorF op2,op3;
+
+			pair<double,double> tmps = helix2.pathLengths(helix3);
+			ox2 = helix2.at(tmps.first);
+			ox3 = helix3.at(tmps.second);
+			op2 = helix2.momentumAt(tmps.first,magn*kilogauss);
+			op3 = helix3.momentumAt(tmps.second,magn*kilogauss);
+
+			tb_dca2to3 = (ox2-ox3).mag();
+			xv023 = (ox2 + ox3)/2.;
+			pv023 = (op2 + op3);
+
+			double pathdau2 = helix2.pathLength(xv023);
+			double pathdau3 = helix3.pathLength(xv023);
+			StThreeVectorF oox2 = helix2.at(pathdau2);
+			StThreeVectorF oox3 = helix3.at(pathdau3);
+			tb_dca2toxv023 = (oox2 - xv023).mag();
+			tb_dca3toxv023 = (oox3 - xv023).mag();
+
+			tb_xv023toPV = (xv023 - pv).mag();// pv or pvx
+
+			double par1 = fabs( (pv.y()-xv023.y())*pv023.z() - (pv.z()-xv023.z())*pv023.y() );
+			double par2 = fabs( (pv.z()-xv023.z())*pv023.x() - (pv.x()-xv023.x())*pv023.z() );
+			double par3 = fabs( (pv.x()-xv023.x())*pv023.y() - (pv.y()-xv023.y())*pv023.x() );
+			double par4 = sqrt(par1*par1 + par2*par2 + par3*par3);
+			double par5 = sqrt(pv023.x()*pv023.x() + pv023.y()*pv023.y() + pv023.z()*pv023.z());
+			double tb_dcaxv023toPV = par4 / par5;
+
+//			get all branch value of v0 xuyifei last 22:15
+//			if(dca2 > 1.0) {cout<<"==================== dca2 cut valid"<<endl;continue;}
+//			if(dca3 > 1.0) {cout<<"==================== dca3 cut valid"<<endl;continue;}
+//			if(tb_dca2to3 > 1.0){cout<<"==================== dca2to3 cut valid"<<endl;continue;}
+//			cout<<"j="<<j<<'\t'<<"k="<<j<<'\t'<<"V0 found !"<<endl;
+			
+			double oe2 = sqrt(mMassProton*mMassProton + op2.mag2());
+			double oe3 = sqrt(mMassPion*mMassPion + op3.mag2());
+			tb_v0mass = sqrt(mMassProton*mMassProton + mMassPion*mMassPion + 2*oe2*oe3 - 2*op2.dot(op3));
+			tb_v0x = xv023.x();
+			tb_v0y = xv023.y();
+			tb_v0z = xv023.z();
+			tb_v0pt= pv023.perp();
+			tb_v0px= pv023.x();
+			tb_v0py= pv023.y();
+			tb_v0pz= pv023.z();
+			tb_v0declen = tb_xv023toPV;
+			tb_v0dca = tb_dcaxv023toPV;
+//			tb_v0eta = 0.5*log( (pv023.mag()+pv023.z())/(pv023.mag()-pv023.z()) );
+			tb_v0eta = pv023.pseudoRapidity();
+
+			double v0energy = sqrt( mMassLambda*mMassLambda + pv023.mag2() );
+			tb_v0rapidity = 0.5*log( (v0energy + pv023.z())/(v0energy - pv023.z()) );
+
+			tb_dau2id = track2->id();
+			tb_dau2dca= dca2;
+			tb_dau2nhits = track2->nHits();
+			tb_dau2nhitsfit = track2->nHitsFit();
+			tb_dau2nhitsposs = track2->nHitsPoss();
+			tb_dau2nhitsdedx = track2->nHitsDedx();
+			tb_dau2eta = track2->eta();
+			tb_dau2dedx = track2->dEdx();
+			tb_dau2nsigma= track2->nSigmaProton();
+			tb_dau2pt = op2.perp();
+			tb_dau2px = op2.x();
+			tb_dau2py = op2.y();
+			tb_dau2pz = op2.z();
+			tb_dau2ParentVxid = track2->idParentVx();
+
+			tb_dau3id = track3->id();
+			tb_dau3dca= dca3;
+			tb_dau3nhits = track3->nHits();
+			tb_dau3nhitsfit = track3->nHitsFit();
+			tb_dau3nhitsposs = track3->nHitsPoss();
+			tb_dau3nhitsdedx = track3->nHitsDedx();
+			tb_dau3eta = track3->eta();
+			tb_dau3dedx = track3->dEdx();
+			tb_dau3nsigma= track3->nSigmaPion();
+			tb_dau3pt = op3.perp();
+			tb_dau3px = op3.x();
+			tb_dau3py = op3.y();
+			tb_dau3pz = op3.z();
+			tb_dau3ParentVxid = track3->idParentVx();
+//*************************************************************************************************
+			mTrackEvent.parentgepid[nv0] = tb_parent_gepid;
+			mTrackEvent.parentidvx[nv0] = tb_parent_idvx;
+			mTrackEvent.parentidvxend[nv0] = tb_parent_idvxend;
+			mTrackEvent.parentcharge[nv0] = tb_parent_charge;
+			mTrackEvent.parenteta[nv0] = tb_parent_eta;
+			mTrackEvent.parentdecayx[nv0] = tb_parentdecay_x;
+			mTrackEvent.parentdecayy[nv0] = tb_parentdecay_y;
+			mTrackEvent.parentdecayz[nv0] = tb_parentdecay_z;
+			mTrackEvent.parentpt[nv0] = tb_parent_pt;
+			mTrackEvent.parentpx[nv0] = tb_parent_px;
+			mTrackEvent.parentpy[nv0] = tb_parent_py;
+			mTrackEvent.parentpx[nv0] = tb_parent_pz;
+
+			mTrackEvent.RcMult = mRcMult;
+			mTrackEvent.v0mass[nv0] = tb_v0mass;
+			mTrackEvent.v0pt[nv0] = tb_v0pt;
+			mTrackEvent.v0rapidity[nv0] = tb_v0rapidity;
+			mTrackEvent.v0eta[nv0] = tb_v0eta;
+			mTrackEvent.v0x[nv0] = tb_v0x;
+			mTrackEvent.v0y[nv0] = tb_v0y;
+			mTrackEvent.v0z[nv0] = tb_v0z;
+			mTrackEvent.v0px[nv0] = tb_v0px;
+			mTrackEvent.v0py[nv0] = tb_v0py;
+			mTrackEvent.v0pz[nv0] = tb_v0pz;
+			mTrackEvent.v0declen[nv0] = tb_v0declen;
+			mTrackEvent.v0dca[nv0] = tb_v0dca;
+		//	mTrackEvent.dca1to2[nv0] = tb_dca1to2;
+		//	mTrackEvent.dca1to3[nv0] = tb_dca1to3;
+			mTrackEvent.dca2to3[nv0] = tb_dca2to3;
+		//	mTrackEvent.dca1toxv0123[nv0] = tb_dca1toxv0123;
+		//	mTrackEvent.dca2toxv0123[nv0] = tb_dca2toxv0123;
+		//	mTrackEvent.dca3toxv0123[nv0] = tb_dca3toxv0123;
+		
+		//	mTrackEvent.dca1toxv012[nv0] = tb_dca1toxv012;
+		//	mTrackEvent.dca2toxv012[nv0] = tb_dca2toxv012;
+			mTrackEvent.dca2toxv023[nv0] = tb_dca2toxv023;
+			mTrackEvent.dca3toxv023[nv0] = tb_dca3toxv023;
+		//	mTrackEvent.dca1toxv013[nv0] = tb_dca1toxv013;
+		//	mTrackEvent.dca3toxv013[nv0] = tb_dca3toxv013;
+		//	mTrackEvent.xv012toPV[nv0] = tb_xv012toPV;
+			mTrackEvent.xv023toPV[nv0] = tb_xv023toPV;
+		//	mTrackEvent.xv013toPV[nv0] = tb_xv013toPV;
+		//	mTrackEvent.dcaxv012toPV[nv0] = tb_dcaxv012toPV;
+			mTrackEvent.dcaxv023toPV[nv0] = tb_dcaxv023toPV;
+		//	mTrackEvent.dcaxv013toPV[nv0] = tb_dcaxv013toPV;
+		/*
+			mTrackEvent.dau1id[nv0] = tb_dau1id;
+			mTrackEvent.dau1dca[nv0] = tb_dau1dca;
+			mTrackEvent.dau1nhits[nv0] = tb_dau1nhits;
+			mTrackEvent.dau1nhitsfit[nv0] = tb_dau1nhitsfit;
+			mTrackEvent.dau1nhitsposs[nv0] = tb_dau1nhitsposs;
+			mTrackEvent.dau1nhitsdedx[nv0] = tb_dau1nhitsdedx;
+			mTrackEvent.dau1eta[nv0] = tb_dau1eta;
+			mTrackEvent.dau1dedx[nv0] = tb_dau1dedx;
+			mTrackEvent.dau1Z[nv0] = tb_dau1Z;
+			mTrackEvent.dau1nsigma[nv0] = tb_dau1nsigma;
+			mTrackEvent.dau1pt[nv0] = tb_dau1pt;
+			mTrackEvent.dau1px[nv0] = tb_dau1px;
+			mTrackEvent.dau1py[nv0] = tb_dau1py;
+			mTrackEvent.dau1pz[nv0] = tb_dau1pz;
+			mTrackEvent.dau1tpc[nv0] = tb_dau1tpc;
+			mTrackEvent.dau1mass[nv0] = tb_dau1mass;
+			mTrackEvent.dau1beta[nv0] = tb_dau1beta;
+		*/
+			mTrackEvent.dau2id[nv0] = tb_dau2id;
+			mTrackEvent.dau2charge[nv0] = tb_dau2charge;
+			mTrackEvent.dau2dca[nv0] = tb_dau2dca;
+			mTrackEvent.dau2nhits[nv0] = tb_dau2nhits;
+			mTrackEvent.dau2nhitsfit[nv0] = tb_dau2nhitsfit;
+			mTrackEvent.dau2nhitsposs[nv0] = tb_dau2nhitsposs;
+			mTrackEvent.dau2nhitsdedx[nv0] = tb_dau2nhitsdedx;
+			mTrackEvent.dau2pathlength[nv0] = tb_dau2pathlength;
+			mTrackEvent.dau2eta[nv0] = tb_dau2eta;
+			mTrackEvent.dau2dedx[nv0] = tb_dau2dedx;
+			mTrackEvent.dau2nsigma[nv0] = tb_dau2nsigma;
+			mTrackEvent.dau2pt[nv0] = tb_dau2pt;
+			mTrackEvent.dau2px[nv0] = tb_dau2px;
+			mTrackEvent.dau2py[nv0] = tb_dau2py;
+			mTrackEvent.dau2pz[nv0] = tb_dau2pz;
+		//	mTrackEvent.dau2tpc[nv0] = tb_dau2tpc;
+		//	mTrackEvent.dau2mass[nv0] = tb_dau2mass;
+		//	mTrackEvent.dau2beta[nv0] = tb_dau2beta;
+			mTrackEvent.dau2GePid[nv0] = tb_dau2GePid;
+			mTrackEvent.dau2ParentVxid[nv0] = tb_dau2ParentVxid;
+			mTrackEvent.dau2assoidvx[nv0] = tb_dau2assoidvx;
+			mTrackEvent.dau2assoidvxend[nv0] = tb_dau2assoidvxend;
+			mTrackEvent.dau2assopt[nv0] = tb_dau2assopt;
+			mTrackEvent.dau2assopx[nv0] = tb_dau2assopx;
+			mTrackEvent.dau2assopy[nv0] = tb_dau2assopy;
+			mTrackEvent.dau2assopz[nv0] = tb_dau2assopz;
+			mTrackEvent.dau2assocharge[nv0] = tb_dau2assocharge;
+		
+			mTrackEvent.dau3id[nv0] = tb_dau3id;
+			mTrackEvent.dau3charge[nv0] = tb_dau3charge;
+			mTrackEvent.dau3dca[nv0] = tb_dau3dca;
+			mTrackEvent.dau3nhits[nv0] = tb_dau3nhits;
+			mTrackEvent.dau3nhitsfit[nv0] = tb_dau3nhitsfit;
+			mTrackEvent.dau3nhitsposs[nv0] = tb_dau3nhitsposs;
+			mTrackEvent.dau3nhitsdedx[nv0] = tb_dau3nhitsdedx;
+			mTrackEvent.dau3pathlength[nv0] = tb_dau3pathlength;
+			mTrackEvent.dau3eta[nv0] = tb_dau3eta;
+			mTrackEvent.dau3dedx[nv0] = tb_dau3dedx;
+			mTrackEvent.dau3nsigma[nv0] = tb_dau3nsigma;
+			mTrackEvent.dau3pt[nv0] = tb_dau3pt;
+			mTrackEvent.dau3px[nv0] = tb_dau3px;
+			mTrackEvent.dau3py[nv0] = tb_dau3py;
+			mTrackEvent.dau3pz[nv0] = tb_dau3pz;
+//			mTrackEvent.dau3tpc[nv0] = tb_dau3tpc;
+//			mTrackEvent.dau3mass[nv0] = tb_dau3mass;
+//			mTrackEvent.dau3beta[nv0] = tb_dau3beta;
+			mTrackEvent.dau3GePid[nv0] = tb_dau3GePid;
+			mTrackEvent.dau3ParentVxid[nv0] = tb_dau3ParentVxid;
+			mTrackEvent.dau3assoidvx[nv0] = tb_dau3assoidvx;
+			mTrackEvent.dau3assoidvxend[nv0] = tb_dau3assoidvxend;
+			mTrackEvent.dau3assopt[nv0] = tb_dau3assopt;
+			mTrackEvent.dau3assopx[nv0] = tb_dau3assopx;
+			mTrackEvent.dau3assopy[nv0] = tb_dau3assopy;
+			mTrackEvent.dau3assopz[nv0] = tb_dau3assopz;
+			mTrackEvent.dau3assocharge[nv0] = tb_dau3assocharge;
+
+			nv0++;
+		//	cout<<"nv0 ="<<nv0<<endl;// debug
+//*************************************************************************************************
+			}
+		}
+	tb_nv0 = nv0;
+	mTrackEvent.nv0 = tb_nv0;
+
+//	cout << "Track variables filled" << endl;
+
+	LOG_DEBUG<<"filled track object"<<endm;
+	trackTree->Fill();
+
+//	mDauDcaVec1.clear();
+//	mDauDcaVec2.clear();
+//	mDauDcaVec3.clear();
+	mDauVec1.clear();
+	mDauVec2.clear();
+	mDauVec3.clear();
+	mDau1GePid.clear();
+	mDau2GePid.clear();
+	mDau3GePid.clear();
+//	mDauMass1.clear();
+//	mDauMass2.clear();
+//	mDauMass3.clear();
+//	mDauBeta1.clear();
+//	mDauBeta2.clear();
+//	mDauBeta3.clear();
+	return kStOK;
+	}

@@ -1,0 +1,72 @@
+
+struct TupTrackEntry
+{
+  //Event level
+  Int_t mIEvt;
+  Int_t OriginMult; //uncorrectedNumberOfPrimaries
+  Int_t McMult;  // number of primary tracks * 10000 + something like McrefMult
+  Float_t  mRcVertexX;
+  Float_t  mRcVertexY;
+  Float_t  mRcVertexZ;
+  Float_t  mMcVertexX;
+  Float_t  mMcVertexY;
+  Float_t  mMcVertexZ;
+  Float_t  MagField;
+
+  //mc track quantities
+  Int_t mNMcTrk;
+  Int_t mMcId[5000];  //StMcTrack::key
+  Int_t mGeantId[5000];
+  float mMcPt[5000];
+  float mMcPz[5000];
+  float mMcEta[5000];
+  float mMcPhi[5000];
+  float mMcStartX[5000];
+  float mMcStartY[5000];   
+  float mMcStartZ[5000];
+  Int_t mMcNTpchits[5000];  //number of TPC hits
+  Int_t mMcNTofhits[5000];  //number of TOF hits
+  Int_t mMcNBemchits[5000];  //number of BEMC hits
+  Int_t mMcNEemchits[5000];  //number of EEMC hits
+  Int_t mMcNFpdhits[5000];  //number of FPD hits
+  float mMcBemcHitSumE[5000]; 
+  float mMcEemcHitSumE[5000]; 
+  float mMcFpdHitSumE[5000]; 
+
+  //properties of reco track
+  Int_t mNRcTrk;
+  Int_t mRcId[5000]; // key of matched track
+  Int_t mRcAssoId[5000]; // key of associated Mc track
+  Int_t mRcAssoGId[5000]; // geant id of associated Mc track
+  float mRcPt[5000];
+  float mRcPz[5000];
+  float mRcEta[5000];
+  float mRcPhi[5000];
+  Int_t mRcNhits[5000]; // number of TPC hits
+  Int_t mRcNhitsPts[5000]; // number of TPC hit points
+  float mRcLength[5000]; // track length in TPC
+  float mRcDedx[5000];
+  Int_t mRcNDedxPts[5000];
+
+
+  float mHelixCurv[5000];
+  float mHelixDip[5000];
+  float mHelixPhase[5000];
+  float mHelixX[5000];
+  float mHelixY[5000];
+  float mHelixZ[5000];
+  float mCharge[5000];
+
+  float mOuterHelixCurv[5000];
+  float mOuterHelixDip[5000];
+  float mOuterHelixPhase[5000];
+  float mOuterHelixX[5000];
+  float mOuterHelixY[5000];
+  float mOuterHelixZ[5000];
+  float mOuterCharge[5000];
+
+  //how well does this track match to the mc track?
+  int sharedTpcHits[5000];  //for all matched tracks
+};
+  TupTrackEntry mTrackEvent;
+
