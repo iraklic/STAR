@@ -1,7 +1,7 @@
 void altroPlotMaker()
 	{
-	TFile * altro3 = new TFile("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/y2014_Altro_3_Out.rectree.root");
-	TFile * altro4 = new TFile("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/y2014_Altro_4_Out.rectree.root");
+	TFile * altro3 = new TFile("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/full_y2014_Altro_4.list.rectree.root");
+	TFile * altro4 = new TFile("/gpfs01/star/pwg/iraklic/mySimulations/AuAu/Pico_generation/full_y2014_Altro_5.list.rectree.root");
 
 	TH1D * hAltro3 = new TH1D ("altro3", "altro3", 50, 0, 50);
 	TH1D * hAltro4 = new TH1D ("altro4", "altro4", 50, 0, 50);

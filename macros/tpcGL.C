@@ -396,8 +396,8 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 			{
 			x = xGGmin[io] + ggWpitch*i;
 			if (x < xmin || x > xmax) continue;
-			Double_t v = vGG + dvGG*(1 - 2*((i + io)%2)); // GG Closed
-//			Double_t v = vGG; // GG Open
+//			Double_t v = vGG + dvGG*(1 - 2*((i + io)%2)); // GG Closed
+			Double_t v = vGG; // GG Open
 			if (io == 0 && i == ng[io]) {cout << "The last  GG wire Inner Sector potential " << v << endl;}
 			if (io == 1 && i ==      0) {cout << "The first GG wire Outer Sector potential " << v << endl;}
 			comp->AddWire(x, yGG, dGG, v, "g");
@@ -944,6 +944,7 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 	ionMap["X"];
 	ionMap["Y"];
 	ionMap["T"];
+	ionMap["type"];
 
 	for (map<string, double>::iterator mi = ionMap.begin(); mi != ionMap.end(); mi++)
 		{
@@ -1066,6 +1067,15 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 					xy_ionL->Fill(X,Y,L);
 					xy_ionLT->Fill(X,Y,L*T);
 
+					if (Y < 0.01 && Y > -0.01)
+						{
+						ionMap["X"] = X;
+						ionMap["Y"] = Y;
+						ionMap["T"] = T;
+						ionMap["type"] = 1;
+						outTree->Fill();
+						}
+
 					if (max_T < T)
 						{
 						max_T = T;
@@ -1076,6 +1086,7 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 				ionMap["X"] = max_X;
 				ionMap["Y"] = max_Y;
 				ionMap["T"] = max_T;
+				ionMap["type"] = 0;
 				outTree->Fill();
 				}
 //			v_i->Plot(true,false);
@@ -1167,6 +1178,15 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 				xy_ionL->Fill(X,Y,L);
 				xy_ionLT->Fill(X,Y,L*T);
 
+				if (Y < 0.01 && Y > -0.01)
+					{
+					ionMap["X"] = X;
+					ionMap["Y"] = Y;
+					ionMap["T"] = T;
+					ionMap["type"] = 1;
+					outTree->Fill();
+					}
+
 				if (max_T < T)
 					{
 					max_T = T;
@@ -1177,6 +1197,8 @@ yPad[0] ________________________| |	| | ..........................    AnodeW ySe
 			ionMap["X"] = max_X;
 			ionMap["Y"] = max_Y;
 			ionMap["T"] = max_T;
+			ionMap["T"] = max_T;
+			ionMap["type"] = 0;
 			outTree->Fill();
 			}
 		}
