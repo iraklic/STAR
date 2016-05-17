@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <TROOT.h>
+#include <TStyle.h>
 #include <TChain.h>
 #include <TFile.h>
 #include "TH2.h"
@@ -98,12 +99,12 @@ void drawHists(vector<myEffSet> vec, vector<string> name)
 		}
 	cEta->cd();
 	leg->Draw();
-	sprintf(outName, "effEta.gif");
+	sprintf(outName, "effEta.C");
 	cEta->SaveAs(outName);
 
 	cPtFull->cd();
 	leg->Draw();
-	sprintf(outName, "effPtFull.gif");
+	sprintf(outName, "effPtFull.C");
 	cPtFull->SaveAs(outName);
 
 	cPtCentral->cd();
@@ -113,7 +114,7 @@ void drawHists(vector<myEffSet> vec, vector<string> name)
 
 	cPtForward->cd();
 	leg->Draw();
-	sprintf(outName, "effPtForward.gif");
+	sprintf(outName, "effPtForward.pdf");
 	cPtForward->SaveAs(outName);
 
 	TCanvas * c  = new TCanvas();
@@ -121,7 +122,7 @@ void drawHists(vector<myEffSet> vec, vector<string> name)
 	gr->Draw("apl");
 	gr->GetXaxis()->SetTitle("Altro Threshold");
 	gr->GetYaxis()->SetTitle("Efficiency");
-	c->SaveAs("efficiencies.gif");
+	c->SaveAs("efficiencies.C");
 
 	delete cEta;
 	delete cPtFull;
@@ -223,6 +224,7 @@ myEffSet efficiency(vector<var> tracks, vector<var> mctracks, string name)
 	}
 int main(int argc, char * argv[])
 	{
+	gStyle->SetOptDate(0);
 	ifstream infile(argv[1]);
 	char file[200];
 	char type[200];
