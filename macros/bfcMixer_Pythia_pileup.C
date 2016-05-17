@@ -45,34 +45,20 @@ StBFChain* chain1 = 0;
 StBFChain* chain2 = 0;
 StBFChain* chain3 = 0;
 
-void bfcMixer_Pythia_pileup(Int_t First = 1, Int_t Last = 100, const Char_t *opt = "",
-	const Char_t* daqfile = "/star/data03/daq/2012/099/13099025/st_zerobias_adc_13099025_raw_1570001.daq",
-	const Char_t* output  = 0, Int_t ranseed=1, const Char_t *geom = "y2012b")
-	{
-	TString Opt(opt);
+//_____________________________________________________________________
+void bfcMixer_Pythia_pileup(Int_t First, Int_t Last, const Char_t *generator = "PythiaPP510Wenu",
+	const Char_t* daqfile = "/star/data03/daq/2013/108/14108097/st_zerobias_adc_14108097_raw_8640001.daq",
+	const Char_t* output  = 0, Int_t ranseed=1, const Char_t *chainOpt = "RC.pp.y2013")
+	{ 
+	TString Generator(generator);
 	TString chain1Opt("in,daq,magF,tpcDb,NoDefault,NoOutput");
 #ifndef __NO_DAQ_CLUSTERS__
 	chain1Opt += ",TpxRaw";
 #endif
-	TString chain2Opt(Form("geant,useXgeom,PythiaPP510Wenu,gen_T,geomT,sim_T,TpcRS,nodefault,Rung.%i",ranseed));
-	TString chain3Opt("noInput,useInTracker,StiCA,VFPPVnoCTB,useBTOF4Vtx,BEmcChkStat,fmsdat,Corr4,OSpaceZ2,OGridLeak3D,-hitfilt");
-	chain2Opt += ",";
-	//	chain2Opt += geom;
-	chain3Opt += ",";
-	//	chain3Opt += geom;
-	TString Geom(geom);
-	if      (Geom.Contains("y2013",TString::kIgnoreCase)) {chain3Opt += ",pp2013a";}
-	else if (Geom.Contains("y2012",TString::kIgnoreCase)) {chain3Opt += ",pp2012b";}
-	else if (Geom.Contains("y2011",TString::kIgnoreCase)) {chain3Opt += ",pp2011a";}
-	else if (Geom.Contains("y2006",TString::kIgnoreCase)) {chain3Opt += ",ry2006g,in,tpcI,Idst,l0,tags,Tree,evout,svtDb,ssdDb,IAna,ppOpt,VFPPVnoCTB,beamline,emcDY2,ftpc,trgd,ZDCvtx,Corr4";}
-	else
-		{
-		cout << "Geometry tag\t" << geom << " is illegal. STOP! " << endl;
-		return;
-		}
-//	TString chain3Opt("noInput,useInTracker,pp2012b,StiCA,VFPPVnoCTB,BEmcChkStat,btof,fmsdat,-hitfilt");
+	TString chain2Opt(Form("geant,useXgeom,%s,gen_T,geomT,sim_T,TpcRS,nodefault,Rung.%i",generator,ranseed));
+	TString chain3Opt(Form("noInput,useInTracker,%s,-hitfilt",chainOpt));
 	chain3Opt += ",TpcMixer"; 
-	if (! Geom.Contains("y2006",TString::kIgnoreCase))
+	if (! chain3Opt.Contains("y2006",TString::kIgnoreCase))
 		{
 		chain3Opt += ",TpxClu";
 		}
@@ -81,14 +67,13 @@ void bfcMixer_Pythia_pileup(Int_t First = 1, Int_t Last = 100, const Char_t *opt
 		chain3Opt += ",TpcX";
 		}
 	chain2Opt += ",beamLine";
-	chain3Opt += ",beamLine,-VFMinuit,VFPPVnoCTB,beamLine,-hitfilt";
-	if (! Geom.Contains("y2006",TString::kIgnoreCase))
+	chain3Opt += ",beamLine";
+	if (! chain3Opt.Contains("y2006",TString::kIgnoreCase))
 		{
 		chain3Opt += ",btof,btofSim,emcSim,EEss"; // EEfs
 		chain3Opt += ",BEmcMixer,EEmcMixer,eemcA2E"; //,emcAtoE
 		}
 	chain3Opt += ",NoHistos,NoRunco,-EvOut";
-	if (Opt != "") {chain3Opt += ","; chain3Opt += Opt;}
 //	chain3Opt += ",KFVertex";
 //	chain3Opt += ",AgML,UseXgeom";
 //	Dynamically link some shared libs
@@ -102,7 +87,7 @@ void bfcMixer_Pythia_pileup(Int_t First = 1, Int_t Last = 100, const Char_t *opt
 	chain1->SetName("One");
 //	chain1->SetAttr(".call","SetActive(0)","St_db_Maker::"); // Use DB cache to reduce overhead
 	Chain->cd();
-//	_______________________________________________________________________________  
+//	________________________________________________________________________________  
 	bfc(-1,chain2Opt);
 	chain2 = chain;
 	chain2->SetName("Two");
@@ -155,10 +140,10 @@ void bfcMixer_Pythia_pileup(Int_t First = 1, Int_t Last = 100, const Char_t *opt
 	if (Last <= 0) return;
 	Chain->EventLoop(First,Last);
 	}
-//	________________________________________________________________________________
-void bfcMixer_Pythia_pileup(Int_t Nevents = 100, const Char_t *opt = "",
-	const Char_t* daqfile = "/star/data03/daq/2012/099/13099025/st_zerobias_adc_13099025_raw_1570001.daq",
-	const Char_t* output = 0, Int_t ranseed=1,const Char_t *geom)
+//________________________________________________________________________________
+void bfcMixer_Pythia_pileup(Int_t Nevents = 100, const Char_t *generator = "PythiaPP510Wenu",
+	const Char_t* daqfile = "/star/data03/daq/2013/108/14108097/st_zerobias_adc_14108097_raw_8640001.daq",
+	const Char_t* output  = 0, Int_t ranseed=1, const Char_t *chainOpt = "RC.pp.y2013")
 	{
-	bfcMixer_Pythia_pileup(1,Nevents,opt,daqfile, output,ranseed,geom);
+	bfcMixer_Pythia_pileup(1,Nevents,generator,daqfile, output,ranseed,chainOpt);
 	}
