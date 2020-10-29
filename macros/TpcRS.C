@@ -134,6 +134,10 @@ void TpcRS(Int_t First, Int_t Last, const Char_t *Run = "y2011,TpcRS", const Cha
 		return;
 		}
 	if (RunOpt.Contains("devT,",TString::kIgnoreCase)) ChainOpt += ",useXgeom";
+
+
+	cout << " -=- IRAKLI -=- RUN IS STARTING WITH OPTIONS : bfc(-1, " << ChainOpt.Data() << ", " << fileIn << ", " << output.Data() << ", " << RootFile.Data() << endl;
+
 	bfc(-1,ChainOpt.Data(),fileIn,output.Data(),RootFile.Data());
 	if (ChainOpt.Contains("TpcRS",TString::kIgnoreCase))
 		{

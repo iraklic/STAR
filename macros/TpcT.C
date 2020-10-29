@@ -4465,9 +4465,7 @@ void T0Offsets(const Char_t *files="*.root", const Char_t *Out = "") {
 			}
 			if (k < 0) continue;
 			Int_t io = 0;
-			if (row > NoInnerRows[sector - 1]) {
-				io = 1;
-			}
+			if (row > NoInnerRows[sector - 1])  io = 1;
 			if (fRcHit_mQuality[l] < 90) continue;
 			Double_t dT = fMcHit_mMcl_t[k]+(0.165+1e6*fMcHit_mTof[k])*Frequency-fRcHit_mMcl_t[l]/64.;
 			T[io]->Fill(fMcHit_mPosition_mX3[k],dT);
