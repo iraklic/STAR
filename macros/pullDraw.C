@@ -45,7 +45,7 @@ void pullDraw(const char * fileName) {
 
 	FILE * resid;
 	resid = fopen("presid.csv", "w");
-	fprintf(resid, "sector, padrow, resid\n");
+	fprintf(resid, "sector, padrow, presidZ\n");
 	for (map<int, TH1D*>::iterator mit = histoMap.begin(); mit != histoMap.end(); mit++) {
 		for (int i = 1; i < 73; i++)
 			fprintf(resid, "%d, %d, %.4f\n", mit->first, i, mit->second->GetBinContent(i));
