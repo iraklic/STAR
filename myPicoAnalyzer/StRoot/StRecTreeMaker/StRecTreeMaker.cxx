@@ -307,14 +307,14 @@ Int_t StRecTreeMaker::Make()
 	mcIdVec.clear();
 
 //	StMuDst*	muDst	= mMuDstMaker->muDst();
-	StMuEvent*	muEvent = mMuDstMaker->muDst()->event();
+	StMuEvent * muEvent = mMuDstMaker->muDst()->event();
 
-	if(!muEvent )
+	if(!muEvent)
 		{
 		cout << "xuyifei: ------------muEvent" << endl;
 		return kStOK;
 		}
-	int mRcMult = muEvent->refMult();
+//	int mRcMult = muEvent->refMult();
 
 //	*******************************************************************
 	double mMassProton = 0.93827;
@@ -347,10 +347,9 @@ Int_t StRecTreeMaker::Make()
 	Int_t NoMuMcTracks = MuMcTracks->GetEntriesFast();
 
 //	=================================================================================================
-	for(Int_t m = 0; m < NoMuMcTracks; m++)
-		{
+	for(Int_t m = 0; m < NoMuMcTracks; m++) {
 		StMuMcTrack *mcTrack = (StMuMcTrack *) MuMcTracks->UncheckedAt(m);
-		if(! mcTrack) continue;
+		if(!mcTrack) continue;
 
 		if (mcTrack->Charge() == 0) continue;
 		if (mcTrack->IdVx() != 1) continue;
@@ -375,7 +374,7 @@ Int_t StRecTreeMaker::Make()
 			}
 		}
 //	-------------------------------------------------------------------------------------------------
-	multimap<Int_t, Int_t> Mc2RcTracks;
+//	multimap<Int_t, Int_t> Mc2RcTracks;
 	int cloneCounter = -999;
 //	vector <int> cloneCheck;
 	cloneCheck.clear();
@@ -435,8 +434,7 @@ Int_t StRecTreeMaker::Make()
 //	------------------------------------------------------------------------
 
 	cloneCheck.clear();
-	for (int l = 0; l < NoPrimaryVertices; l++)
-		{
+	for (int l = 0; l < NoPrimaryVertices; l++) {
 		StMuPrimaryVertex *Vtx = (StMuPrimaryVertex *) PrimaryVertices->UncheckedAt(l);
 		if(!Vtx)
 			{

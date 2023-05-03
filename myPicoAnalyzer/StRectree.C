@@ -73,11 +73,8 @@ void StRectree(const Char_t *fileList, const Char_t *qaflag = "")
 	for (Int_t iev = 0; iev < nevents; iev++)
 		{
 		if(iev % 100 == 0) cout << "Working on eventNumber " << iev << endl;
-//		cout << "xuyifei : iev/nevents = " << iev << "/"<<nevents << '\t' << endl;;
 		chain->Clear();
-//		cout<<"Call Make method ---> ";
 		int iret = chain->Make(iev); // This should call the Make() method in ALL makers    
-//		cout<<"Make method called"<<endl;
 		if (iret)
 			{
 			cout << "Bad return code!" << endl;

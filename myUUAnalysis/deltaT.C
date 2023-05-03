@@ -1,4 +1,0 @@
-deltaT()
-	{
-	cout << "test" << endl;
-	}
